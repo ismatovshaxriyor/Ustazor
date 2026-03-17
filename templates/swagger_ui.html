@@ -1,0 +1,2398 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>API Docs</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1'%3E%3Cstop stop-color='%23818cf8'/%3E%3Cstop offset='1' stop-color='%236ee7b7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Cpath d='M36 10L18 36h12l-2 18 18-26H34z' fill='%230a0a0f'/%3E%3C/svg%3E"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"
+    />
+    <style>
+      :root {
+        --bg: #0a0a0f;
+        --surface: #111118;
+        --surface2: #1a1a24;
+        --surface3: #22222e;
+        --border: rgba(255, 255, 255, 0.07);
+        --accent: #6ee7b7;
+        --accent2: #818cf8;
+        --accent3: #f472b6;
+        --text: #e2e8f0;
+        --text-muted: #64748b;
+        --text-dim: #94a3b8;
+        --get: #5ea0e4;
+        --post: #4dc28b;
+        --put: #f6a032;
+        --delete: #ff4545;
+        --patch: #4fd0be;
+        --radius: 12px;
+        --radius-sm: 8px;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Syne", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* ─── Noise overlay ─── */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ─── Ambient blobs ─── */
+      .blob {
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(120px);
+        opacity: 0.08;
+        pointer-events: none;
+        z-index: 0;
+        animation: drift 20s ease-in-out infinite alternate;
+      }
+      .blob-1 {
+        width: 600px;
+        height: 600px;
+        background: var(--accent2);
+        top: -200px;
+        left: -100px;
+      }
+      .blob-2 {
+        width: 500px;
+        height: 500px;
+        background: var(--accent);
+        bottom: -150px;
+        right: -100px;
+        animation-delay: -8s;
+      }
+      .blob-3 {
+        width: 400px;
+        height: 400px;
+        background: var(--accent3);
+        top: 40%;
+        left: 40%;
+        animation-delay: -4s;
+      }
+
+      @keyframes drift {
+        from {
+          transform: translate(0, 0) scale(1);
+        }
+        to {
+          transform: translate(40px, 30px) scale(1.08);
+        }
+      }
+
+      /* ─── Header ─── */
+      #header {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: rgba(10, 10, 15, 0.85);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border-bottom: 1px solid var(--border);
+        padding: 0 40px;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .logo-mark {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, var(--accent2), var(--accent));
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 14px;
+        color: #000;
+        flex-shrink: 0;
+        position: relative;
+        overflow: hidden;
+      }
+      .logo-mark::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          135deg,
+          transparent 40%,
+          rgba(255, 255, 255, 0.2)
+        );
+      }
+
+      .header-title {
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.3px;
+        color: var(--text);
+      }
+
+      .header-version {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        color: var(--text-muted);
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        padding: 3px 10px;
+        border-radius: 20px;
+        margin-left: 4px;
+      }
+
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .header-auth-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--accent);
+        background: rgba(110, 231, 183, 0.1);
+        border: 1px solid rgba(110, 231, 183, 0.32);
+        padding: 8px 15px;
+        border-radius: 20px;
+        cursor: pointer;
+        transition: all 0.16s ease;
+      }
+      .header-auth-btn:hover {
+        background: rgba(110, 231, 183, 0.16);
+        border-color: rgba(110, 231, 183, 0.45);
+      }
+      .header-auth-btn.is-authorized {
+        color: #b7ffdf;
+        background: rgba(110, 231, 183, 0.2);
+      }
+      .header-auth-btn::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        background: var(--accent);
+        border-radius: 50%;
+        animation: pulse-dot 2s ease-in-out infinite;
+      }
+      @keyframes pulse-dot {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.5;
+          transform: scale(0.8);
+        }
+      }
+
+      /* ─── Layout ─── */
+      #main-layout {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        min-height: calc(100vh - 64px);
+      }
+
+      /* ─── Sidebar ─── */
+      #sidebar {
+        width: 260px;
+        flex-shrink: 0;
+        position: sticky;
+        top: 64px;
+        height: calc(100vh - 64px);
+        overflow-y: auto;
+        padding: 24px 16px;
+        border-right: 1px solid var(--border);
+        background: rgba(17, 17, 24, 0.5);
+        scrollbar-width: thin;
+        scrollbar-color: var(--surface3) transparent;
+      }
+
+      #sidebar::-webkit-scrollbar {
+        width: 4px;
+      }
+      #sidebar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      #sidebar::-webkit-scrollbar-thumb {
+        background: var(--surface3);
+        border-radius: 4px;
+      }
+
+      .sidebar-section {
+        margin-bottom: 28px;
+      }
+
+      .sidebar-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        padding: 0 8px;
+        margin-bottom: 8px;
+      }
+
+      .sidebar-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        transition: all 0.15s ease;
+        color: var(--text-dim);
+        font-size: 17px;
+        font-weight: 500;
+        border: 1px solid transparent;
+        text-decoration: none;
+      }
+      .sidebar-item:hover {
+        background: var(--surface2);
+        color: var(--text);
+        border-color: var(--border);
+      }
+      .sidebar-item.active {
+        background: rgba(110, 231, 183, 0.08);
+        border-color: rgba(110, 231, 183, 0.2);
+        color: var(--accent);
+      }
+      .sidebar-empty {
+        color: var(--text-muted);
+        font-size: 13px;
+        padding: 6px 10px;
+      }
+      .favorite-item {
+        align-items: center;
+        justify-content: flex-start;
+        gap: 8px;
+      }
+      .favorite-path {
+        display: inline-block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .method-badge {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 3px 7px;
+        border-radius: 4px;
+        flex-shrink: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .badge-get {
+        background: var(--get);
+        color: #ffffff;
+      }
+      .badge-post {
+        background: var(--post);
+        color: #ffffff;
+      }
+      .badge-put {
+        background: var(--put);
+        color: #ffffff;
+      }
+      .badge-delete {
+        background: var(--delete);
+        color: #ffffff;
+      }
+      .badge-patch {
+        background: var(--patch);
+        color: #ffffff;
+      }
+
+      /* ─── Content ─── */
+      #content {
+        flex: 1;
+        padding: 32px 40px;
+        min-width: 0;
+      }
+
+      /* ─── Stats bar ─── */
+      .stats-bar {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+      }
+
+      .stat-card {
+        flex: 1;
+        min-width: 120px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 20px 22px;
+        position: relative;
+        overflow: hidden;
+        transition: border-color 0.2s;
+      }
+      .stat-card:hover {
+        border-color: rgba(255, 255, 255, 0.15);
+      }
+      .stat-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--card-accent, var(--accent2));
+      }
+      .stat-label {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 13px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+      }
+      .stat-value {
+        font-size: 36px;
+        font-weight: 800;
+        color: var(--text);
+        line-height: 1;
+      }
+      .stat-sub {
+        font-size: 15px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+
+      /* ─── Swagger override ─── */
+      #swagger-ui-container {
+        background: transparent;
+      }
+
+      .swagger-ui {
+        font-family: "Syne", sans-serif !important;
+      }
+
+      .swagger-ui .topbar {
+        display: none !important;
+      }
+      .swagger-ui .info {
+        display: none !important;
+      }
+      .swagger-ui .scheme-container {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius) !important;
+        padding: 16px 20px !important;
+        box-shadow: none !important;
+        margin-bottom: 24px !important;
+      }
+
+      .swagger-ui .wrapper {
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+
+      /* Operation blocks */
+      .swagger-ui .opblock {
+        background: rgba(198, 203, 212, 0.14) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius) !important;
+        box-shadow: none !important;
+        margin-bottom: 5px !important;
+        overflow: hidden !important;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s !important;
+      }
+      .swagger-ui .opblock:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.24) !important;
+      }
+
+      .swagger-ui .opblock.opblock-get {
+        border-color: var(--get) !important;
+        background: rgba(94, 160, 228, 0.18) !important;
+      }
+      .swagger-ui .opblock.opblock-post {
+        border-color: var(--post) !important;
+        background: rgba(77, 194, 139, 0.18) !important;
+      }
+      .swagger-ui .opblock.opblock-put {
+        border-color: var(--put) !important;
+        background: rgba(246, 160, 50, 0.17) !important;
+      }
+      .swagger-ui .opblock.opblock-delete {
+        border-color: var(--delete) !important;
+        background: rgba(255, 69, 69, 0.17) !important;
+      }
+      .swagger-ui .opblock.opblock-patch {
+        border-color: var(--patch) !important;
+        background: rgba(79, 208, 190, 0.17) !important;
+      }
+
+      .swagger-ui .opblock .opblock-summary {
+        padding: 10px 14px !important;
+        border: none !important;
+      }
+      .swagger-ui .opblock .favorite-toggle {
+        margin-left: auto !important;
+        margin-right: 10px !important;
+        border: 1px solid var(--border) !important;
+        background: transparent !important;
+        color: var(--text-muted) !important;
+        width: 24px !important;
+        height: 24px !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        font-size: 14px !important;
+        line-height: 1 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.16s ease !important;
+      }
+      .swagger-ui .opblock .favorite-toggle:hover {
+        color: var(--put) !important;
+        border-color: rgba(251, 191, 36, 0.4) !important;
+        background: rgba(251, 191, 36, 0.08) !important;
+      }
+      .swagger-ui .opblock .favorite-toggle.is-favorite {
+        color: var(--put) !important;
+        border-color: rgba(251, 191, 36, 0.4) !important;
+        background: rgba(251, 191, 36, 0.1) !important;
+      }
+      .swagger-ui .opblock-summary-method {
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        letter-spacing: 1px !important;
+        border-radius: 6px !important;
+        padding: 6px 12px !important;
+        min-width: 84px !important;
+        text-align: center !important;
+      }
+      .swagger-ui .opblock.opblock-get .opblock-summary-method {
+        background: var(--get) !important;
+        color: #ffffff !important;
+      }
+      .swagger-ui .opblock.opblock-post .opblock-summary-method {
+        background: var(--post) !important;
+        color: #ffffff !important;
+      }
+      .swagger-ui .opblock.opblock-put .opblock-summary-method {
+        background: var(--put) !important;
+        color: #ffffff !important;
+      }
+      .swagger-ui .opblock.opblock-delete .opblock-summary-method {
+        background: var(--delete) !important;
+        color: #ffffff !important;
+      }
+      .swagger-ui .opblock.opblock-patch .opblock-summary-method {
+        background: var(--patch) !important;
+        color: #ffffff !important;
+      }
+
+      .swagger-ui .opblock-summary-path {
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 17px !important;
+        color: #dbe7fb !important;
+        font-weight: 600 !important;
+        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25) !important;
+      }
+      .swagger-ui .opblock-summary-description {
+        font-size: 16px !important;
+        color: #b5c6df !important;
+        font-family: "Syne", sans-serif !important;
+      }
+      .swagger-ui .opblock-summary-path a,
+      .swagger-ui .opblock-summary-path__deprecated {
+        color: inherit !important;
+      }
+
+      /* Tag sections */
+      .swagger-ui .opblock-tag {
+        font-family: "Syne", sans-serif !important;
+        font-size: 20px !important;
+        font-weight: 700 !important;
+        color: var(--text) !important;
+        border-bottom: 1px solid var(--border) !important;
+        padding: 8px 0 !important;
+        margin: 16px 0 8px !important;
+      }
+      /* Remove extra padding in opblock-tag-section */
+      .swagger-ui .opblock-tag-section {
+        margin-bottom: 4px !important;
+      }
+      /* Tighten the operation blocks list */
+      .swagger-ui .opblock-tag-section > div {
+        padding: 0 !important;
+      }
+      .swagger-ui .opblock-tag small {
+        font-size: 13px !important;
+        color: var(--text-muted) !important;
+        font-weight: 400 !important;
+      }
+
+      /* Expanded content */
+      .swagger-ui .opblock-body,
+      .swagger-ui .opblock-section,
+      .swagger-ui .opblock-description-wrapper {
+        background: var(--surface2) !important;
+        border-top: 1px solid var(--border) !important;
+      }
+      .swagger-ui .opblock-section-header {
+        background: var(--surface3) !important;
+        border-bottom: 1px solid var(--border) !important;
+        padding: 10px 18px !important;
+      }
+      .swagger-ui .opblock-section-header h4 {
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 12px !important;
+        color: var(--text-muted) !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+      }
+
+      /* Tables */
+      .swagger-ui table thead tr th,
+      .swagger-ui table thead tr td {
+        background: var(--surface3) !important;
+        color: var(--text-muted) !important;
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 11px !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        border-bottom: 1px solid var(--border) !important;
+        padding: 10px 14px !important;
+      }
+      .swagger-ui table tbody tr td {
+        background: transparent !important;
+        border-bottom: 1px solid var(--border) !important;
+        color: var(--text-dim) !important;
+        font-size: 14px !important;
+        padding: 10px 14px !important;
+      }
+
+      /* Parameters */
+      .swagger-ui .parameter__name {
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 14px !important;
+        color: var(--text) !important;
+      }
+      .swagger-ui .parameter__type {
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 12px !important;
+        color: var(--accent2) !important;
+      }
+      .swagger-ui .parameter__in {
+        font-size: 11px !important;
+        color: var(--text-muted) !important;
+      }
+      .swagger-ui .parameter__deprecated {
+        color: var(--delete) !important;
+      }
+
+      /* Inputs */
+      .swagger-ui input[type="text"],
+      .swagger-ui input[type="password"],
+      .swagger-ui input[type="search"],
+      .swagger-ui input[type="email"],
+      .swagger-ui textarea,
+      .swagger-ui select {
+        background: var(--surface3) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius-sm) !important;
+        color: var(--text) !important;
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 14px !important;
+        padding: 8px 12px !important;
+        outline: none !important;
+        transition: border-color 0.2s !important;
+      }
+      .swagger-ui input:focus,
+      .swagger-ui textarea:focus,
+      .swagger-ui select:focus {
+        border-color: var(--accent2) !important;
+        box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1) !important;
+      }
+
+      /* Buttons */
+      .swagger-ui .btn {
+        font-family: "Syne", sans-serif !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        border-radius: var(--radius-sm) !important;
+        padding: 8px 16px !important;
+        letter-spacing: 0.3px !important;
+        transition: all 0.15s ease !important;
+        border: 1px solid var(--border) !important;
+        cursor: pointer !important;
+      }
+      .swagger-ui .btn.execute {
+        background: var(--accent2) !important;
+        border-color: var(--accent2) !important;
+        color: #fff !important;
+      }
+      .swagger-ui .btn.execute:hover {
+        background: #6366f1 !important;
+        box-shadow: 0 4px 16px rgba(129, 140, 248, 0.35) !important;
+      }
+      .swagger-ui .btn.authorize {
+        background: transparent !important;
+        border-color: var(--accent) !important;
+        color: var(--accent) !important;
+      }
+      .swagger-ui .btn.authorize:hover {
+        background: rgba(110, 231, 183, 0.08) !important;
+      }
+      .swagger-ui .btn.cancel {
+        background: transparent !important;
+        border-color: var(--delete) !important;
+        color: var(--delete) !important;
+      }
+      .swagger-ui .btn.try-out__btn {
+        background: transparent !important;
+        border-color: rgba(129, 140, 248, 0.4) !important;
+        color: var(--accent2) !important;
+      }
+      .swagger-ui .btn.try-out__btn:hover {
+        background: rgba(129, 140, 248, 0.08) !important;
+      }
+
+      /* Code / response */
+      .swagger-ui .highlight-code,
+      .swagger-ui .microlight {
+        background: var(--bg) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius-sm) !important;
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 13px !important;
+        line-height: 1.6 !important;
+        padding: 16px !important;
+        color: var(--text) !important;
+      }
+
+      .swagger-ui .responses-table .response-col_status {
+        font-family: "JetBrains Mono", monospace !important;
+        font-weight: 600 !important;
+      }
+
+      /* Response codes coloring */
+      .swagger-ui .responses-table tr[data-code="200"] .response-col_status,
+      .swagger-ui .responses-table tr[data-code="201"] .response-col_status {
+        color: var(--get) !important;
+      }
+      .swagger-ui .responses-table tr[data-code="400"] .response-col_status,
+      .swagger-ui .responses-table tr[data-code="422"] .response-col_status {
+        color: var(--put) !important;
+      }
+      .swagger-ui .responses-table tr[data-code="401"] .response-col_status,
+      .swagger-ui .responses-table tr[data-code="403"] .response-col_status,
+      .swagger-ui .responses-table tr[data-code="404"] .response-col_status,
+      .swagger-ui .responses-table tr[data-code="500"] .response-col_status {
+        color: var(--delete) !important;
+      }
+
+      /* Models section */
+      .swagger-ui section.models {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius) !important;
+        overflow: hidden !important;
+        margin-top: 32px !important;
+      }
+      .swagger-ui section.models h4 {
+        font-family: "Syne", sans-serif !important;
+        font-weight: 700 !important;
+        color: var(--text) !important;
+        font-size: 15px !important;
+        padding: 14px 18px !important;
+        border-bottom: 1px solid var(--border) !important;
+      }
+      .swagger-ui .model-container {
+        background: var(--surface2) !important;
+      }
+      .swagger-ui .model-title {
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 13px !important;
+        color: var(--accent2) !important;
+      }
+      .swagger-ui .model {
+        color: var(--text-dim) !important;
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 12px !important;
+      }
+
+      /* General text */
+      .swagger-ui p,
+      .swagger-ui li,
+      .swagger-ui label {
+        font-family: "Syne", sans-serif !important;
+        color: var(--text-dim) !important;
+      }
+      .swagger-ui h1,
+      .swagger-ui h2,
+      .swagger-ui h3,
+      .swagger-ui h4,
+      .swagger-ui h5 {
+        font-family: "Syne", sans-serif !important;
+        color: var(--text) !important;
+      }
+
+      /* Scrollbar global */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: var(--bg);
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--surface3);
+        border-radius: 3px;
+      }
+
+      /* Auth modal — sahifaning to'liq ustida, markazda */
+      .swagger-ui .dialog-ux {
+        position: fixed !important;
+        inset: 0 !important;
+        z-index: 9999 !important;
+        background: rgba(0, 0, 0, 0.7) !important;
+        backdrop-filter: blur(6px) !important;
+        -webkit-backdrop-filter: blur(6px) !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        overflow: hidden !important;
+      }
+      /* Swagger UI modal-ux-container — flexbox markaz */
+      .swagger-ui .dialog-ux .modal-ux-container {
+        position: fixed !important;
+        inset: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        z-index: 10000 !important;
+        pointer-events: none !important;
+      }
+      .swagger-ui .dialog-ux .modal-ux {
+        pointer-events: all !important;
+        position: relative !important;
+        top: auto !important;
+        left: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        transform: none !important;
+        margin: 0 !important;
+        width: 520px !important;
+        max-width: calc(100vw - 40px) !important;
+        max-height: 80vh !important;
+        overflow-y: auto !important;
+        background: var(--surface) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 16px !important;
+        box-shadow:
+          0 32px 80px rgba(0, 0, 0, 0.7),
+          0 0 0 1px rgba(129, 140, 248, 0.1) !important;
+        animation: modalIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both !important;
+      }
+      @keyframes modalIn {
+        from {
+          opacity: 0;
+          transform: scale(0.94) translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1) translateY(0);
+        }
+      }
+      .swagger-ui .dialog-ux .modal-ux-header {
+        background: var(--surface2) !important;
+        border-bottom: 1px solid var(--border) !important;
+        padding: 18px 22px !important;
+        border-radius: 16px 16px 0 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+      }
+      .swagger-ui .dialog-ux .modal-ux-header h3 {
+        font-family: "Syne", sans-serif !important;
+        font-weight: 700 !important;
+        font-size: 16px !important;
+        color: var(--text) !important;
+      }
+      .swagger-ui .dialog-ux .modal-ux-header button {
+        background: var(--surface3) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 8px !important;
+        color: var(--text-muted) !important;
+        width: 30px !important;
+        height: 30px !important;
+        cursor: pointer !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.15s !important;
+      }
+      .swagger-ui .dialog-ux .modal-ux-header button:hover {
+        background: rgba(248, 113, 113, 0.15) !important;
+        border-color: rgba(248, 113, 113, 0.4) !important;
+        color: var(--delete) !important;
+      }
+      .swagger-ui .dialog-ux .modal-ux-content {
+        background: var(--surface) !important;
+        padding: 22px !important;
+        border-radius: 0 0 16px 16px !important;
+      }
+
+      /* Loading */
+      .swagger-ui .loading-container .loading::before {
+        border-color: var(--accent2) transparent transparent transparent !important;
+      }
+
+      /* Expand/collapse arrows */
+      .swagger-ui .arrow {
+        fill: var(--text-muted) !important;
+      }
+
+      /* Copy & download controls in response code blocks */
+      .swagger-ui .highlight-code .download-contents {
+        right: 10px !important;
+        bottom: 10px !important;
+        width: 146px !important;
+        height: 38px !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 8px !important;
+        background: var(--surface3) !important;
+        color: #dbe7fb !important;
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+      }
+      .swagger-ui .highlight-code .download-contents:hover {
+        background: rgba(129, 140, 248, 0.18) !important;
+        border-color: rgba(129, 140, 248, 0.45) !important;
+      }
+      .swagger-ui .highlight-code .download-contents button {
+        background: none !important;
+        border: none !important;
+        color: inherit !important;
+        font: inherit !important;
+        line-height: 1 !important;
+        cursor: pointer !important;
+        white-space: nowrap !important;
+      }
+
+      .swagger-ui .highlight-code .copy-to-clipboard {
+        right: 166px !important;
+        bottom: 10px !important;
+        width: 98px !important;
+        height: 38px !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 8px !important;
+        background: var(--surface3) !important;
+      }
+      .swagger-ui .highlight-code .copy-to-clipboard:active {
+        background: rgba(129, 140, 248, 0.22) !important;
+      }
+      .swagger-ui .highlight-code .copy-to-clipboard button {
+        background: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        color: #dbe7fb !important;
+        width: 100% !important;
+        height: 100% !important;
+        padding: 0 10px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        font-family: "JetBrains Mono", monospace !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        cursor: pointer !important;
+      }
+      .swagger-ui .highlight-code .copy-to-clipboard button:hover {
+        color: #eaf1ff !important;
+      }
+      .swagger-ui .highlight-code .copy-to-clipboard button svg {
+        width: 14px !important;
+        height: 14px !important;
+        fill: currentColor !important;
+        color: currentColor !important;
+      }
+      .swagger-ui .highlight-code .copy-to-clipboard button::after {
+        content: "Copy";
+      }
+
+      /* Keep curl copy compact */
+      .swagger-ui .curl-command .copy-to-clipboard {
+        right: 10px !important;
+        bottom: 5px !important;
+        width: 20px !important;
+        height: 20px !important;
+      }
+      .swagger-ui .curl-command .copy-to-clipboard button {
+        padding: 0 !important;
+      }
+      .swagger-ui .curl-command .copy-to-clipboard button::after {
+        content: "";
+      }
+
+      /* Quick copy panel */
+      .quick-copy-panel {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: rgba(15, 16, 26, 0.82);
+        padding: 10px;
+        margin-bottom: 10px;
+      }
+      .quick-copy-title {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+      }
+      .quick-copy-row {
+        display: grid;
+        grid-template-columns: 90px 1fr auto;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .quick-copy-row:last-child {
+        margin-bottom: 0;
+      }
+      .quick-copy-key {
+        font-family: "JetBrains Mono", monospace;
+        color: var(--text-dim);
+        font-size: 12px;
+      }
+      .quick-copy-value {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        border-radius: 6px;
+        padding: 5px 7px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .quick-copy-btn {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        border: 1px solid rgba(110, 231, 183, 0.28);
+        color: var(--accent);
+        background: rgba(110, 231, 183, 0.1);
+        border-radius: 6px;
+        padding: 6px 8px;
+        cursor: pointer;
+      }
+      .quick-copy-btn:hover {
+        background: rgba(110, 231, 183, 0.16);
+      }
+
+      /* Hide built-in auth controls/modal (we use custom modal) */
+      .swagger-ui .scheme-container {
+        display: none !important;
+      }
+      .swagger-ui .dialog-ux {
+        display: none !important;
+      }
+      .swagger-ui .filter-container {
+        display: none !important;
+      }
+
+      /* Custom authorize modal */
+      .custom-auth-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 15000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .custom-auth-modal[hidden] {
+        display: none !important;
+      }
+      .custom-auth-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.72);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+      }
+      .custom-auth-dialog {
+        position: relative;
+        z-index: 1;
+        width: min(640px, calc(100vw - 40px));
+        background: var(--surface);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 12px;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.65);
+      }
+      .custom-auth-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface2);
+        border-radius: 12px 12px 0 0;
+      }
+      .custom-auth-header h3 {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .custom-auth-close {
+        width: 32px;
+        height: 32px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface3);
+        color: var(--text-muted);
+        cursor: pointer;
+      }
+      .custom-auth-body {
+        padding: 20px;
+      }
+      .custom-auth-scheme {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 19px;
+        margin: 0 0 8px;
+      }
+      .custom-auth-description {
+        color: var(--text-dim);
+        font-size: 13px;
+        margin: 0 0 12px;
+      }
+      .custom-auth-label {
+        display: block;
+        font-family: "JetBrains Mono", monospace;
+        color: var(--text-muted);
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+      #custom-auth-input {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        background: var(--surface3);
+        color: var(--text);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 15px;
+      }
+      #custom-auth-input:focus {
+        outline: none;
+        border-color: rgba(129, 140, 248, 0.5);
+        box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+      }
+      .custom-auth-actions {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .custom-auth-btn {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 14px;
+        background: var(--surface2);
+        color: var(--text);
+        cursor: pointer;
+      }
+      .custom-auth-btn.primary {
+        border-color: rgba(129, 140, 248, 0.42);
+        background: rgba(129, 140, 248, 0.16);
+        color: #c9d2ff;
+      }
+      .custom-auth-btn.danger {
+        border-color: rgba(248, 113, 113, 0.34);
+        background: rgba(248, 113, 113, 0.14);
+        color: #ffb4b4;
+      }
+      .custom-auth-status {
+        margin-top: 10px;
+        min-height: 18px;
+        color: var(--text-muted);
+        font-size: 12px;
+      }
+
+      /* Search bar */
+      #custom-search {
+        position: relative;
+        margin-bottom: 24px;
+      }
+      #custom-search input {
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 17px;
+        padding: 12px 16px 12px 44px;
+        outline: none;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      #custom-search input:focus {
+        border-color: rgba(129, 140, 248, 0.5);
+        box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.08);
+      }
+      #custom-search input::placeholder {
+        color: var(--text-muted);
+      }
+      .search-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        pointer-events: none;
+      }
+
+      /* Fade-in animation */
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(16px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .stats-bar {
+        animation: fadeUp 0.4s ease both;
+      }
+      #custom-search {
+        animation: fadeUp 0.4s 0.1s ease both;
+      }
+      #swagger-ui-container {
+        animation: fadeUp 0.4s 0.2s ease both;
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        #sidebar {
+          display: none;
+        }
+        #content {
+          padding: 20px;
+        }
+        #header {
+          padding: 0 20px;
+        }
+        .stats-bar {
+          gap: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Ambient blobs -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+
+    <!-- Header -->
+    <header id="header">
+      <div class="header-left">
+        <div class="logo-mark">⚡</div>
+        <span class="header-title">API Docs</span>
+        <span class="header-version" id="api-version">v1.0</span>
+      </div>
+      <div class="header-right">
+        <button id="header-auth-btn" class="header-auth-btn" type="button">
+          <span id="header-auth-label">Authorize</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Layout -->
+    <div id="main-layout">
+      <!-- Sidebar -->
+      <aside id="sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-label">Navigation</div>
+          <a class="sidebar-item active" href="#" id="all-link">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+            </svg>
+            All Endpoints
+          </a>
+          <a class="sidebar-item" href="#" id="auth-link">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span id="sidebar-auth-label">Authorize</span>
+          </a>
+          <a class="sidebar-item" href="#" id="models-link">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+            Schemas
+          </a>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-label">Favorites</div>
+          <div id="sidebar-favorites">
+            <div class="sidebar-empty">No favorites yet</div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-label">Tags</div>
+          <div id="sidebar-tags">
+            <!-- dynamically filled -->
+          </div>
+        </div>
+      </aside>
+
+      <!-- Content -->
+      <main id="content">
+        <!-- Stats -->
+        <div class="stats-bar" id="stats-bar">
+          <div class="stat-card" style="--card-accent: var(--accent2)">
+            <div class="stat-label">Endpoints</div>
+            <div class="stat-value" id="stat-endpoints">—</div>
+            <div class="stat-sub">Total routes</div>
+          </div>
+          <div class="stat-card" style="--card-accent: var(--accent)">
+            <div class="stat-label">Tags</div>
+            <div class="stat-value" id="stat-tags">—</div>
+            <div class="stat-sub">API groups</div>
+          </div>
+          <div class="stat-card" style="--card-accent: var(--put)">
+            <div class="stat-label">Schemas</div>
+            <div class="stat-value" id="stat-schemas">—</div>
+            <div class="stat-sub">Data models</div>
+          </div>
+          <div class="stat-card" style="--card-accent: var(--accent3)">
+            <div class="stat-label">Auth</div>
+            <div class="stat-value" id="stat-auth">—</div>
+            <div class="stat-sub">Security schemes</div>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div id="custom-search">
+          <svg
+            class="search-icon"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Filter endpoints…"
+            autocomplete="off"
+          />
+        </div>
+
+        <!-- Swagger UI -->
+        <div id="swagger-ui-container"></div>
+      </main>
+    </div>
+
+    <div id="custom-auth-modal" class="custom-auth-modal" hidden>
+      <div class="custom-auth-backdrop" data-auth-close="1"></div>
+      <div
+        class="custom-auth-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="custom-auth-title"
+      >
+        <div class="custom-auth-header">
+          <h3 id="custom-auth-title">Available authorizations</h3>
+          <button class="custom-auth-close" type="button" data-auth-close="1">
+            ×
+          </button>
+        </div>
+        <div class="custom-auth-body">
+          <h4 class="custom-auth-scheme" id="custom-auth-scheme">
+            jwtAuth (http, Bearer)
+          </h4>
+          <p class="custom-auth-description">
+            Paste your bearer token value.
+          </p>
+          <label class="custom-auth-label" for="custom-auth-input">Value:</label>
+          <input
+            id="custom-auth-input"
+            type="text"
+            inputmode="text"
+            name="api_bearer_token"
+            autocomplete="one-time-code"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          />
+          <div class="custom-auth-actions">
+            <button
+              id="custom-auth-clear"
+              class="custom-auth-btn danger"
+              type="button"
+            >
+              Logout
+            </button>
+            <button
+              id="custom-auth-cancel"
+              class="custom-auth-btn"
+              type="button"
+            >
+              Close
+            </button>
+            <button
+              id="custom-auth-save"
+              class="custom-auth-btn primary"
+              type="button"
+            >
+              Authorize
+            </button>
+          </div>
+          <div
+            id="custom-auth-status"
+            class="custom-auth-status"
+            aria-live="polite"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-standalone-preset.js"></script>
+    <script>
+      const SCHEMA_URL = "{% url 'schema' %}";
+      const METHODS = [
+        "get",
+        "post",
+        "put",
+        "patch",
+        "delete",
+        "options",
+        "head",
+      ];
+      // Generate unique storage keys based on the schema URL to avoid cross-project conflicts
+      const STORAGE_PREFIX = `swagger_ui_${btoa(SCHEMA_URL).replace(/[/+=]/g, '')}_v1`;
+      const FAVORITES_STORAGE_KEY = `${STORAGE_PREFIX}_favorites`;
+      const AUTH_TOKEN_STORAGE_KEY = `${STORAGE_PREFIX}_auth_token`;
+      const COPY_EXACT_KEYS = [
+        "access",
+        "refresh",
+        "access_token",
+        "refresh_token",
+        "id",
+        "uuid",
+        "pk",
+        "slug",
+      ];
+      const COPY_MAX_ITEMS = 10;
+
+      const favoriteEndpoints = new Set(loadFavoriteEndpointIds());
+      let uiEnhanceTimer = null;
+      let quickCopyScanTimer = null;
+      let tagsEventBound = false;
+      let favoritesEventBound = false;
+
+      const ui = SwaggerUIBundle({
+        url: SCHEMA_URL,
+        dom_id: "#swagger-ui-container",
+        deepLinking: true,
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+        layout: "StandaloneLayout",
+        persistAuthorization: true,
+        displayRequestDuration: true,
+        filter: false,
+        tryItOutEnabled: false,
+        defaultModelsExpandDepth: 1,
+        defaultModelExpandDepth: 1,
+        onComplete: () => {
+          hydrateSpecUi();
+          bindSidebarTagEvents();
+          bindFavoritesSidebarEvents();
+          syncAuthUiState();
+          queueUiEnhancements(180);
+          setTimeout(() => queueUiEnhancements(100), 800);
+        },
+      });
+
+      function normalizeText(value) {
+        return String(value || "")
+          .toLowerCase()
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function setSidebarActive(activeItem) {
+        document
+          .querySelectorAll("#sidebar .sidebar-item")
+          .forEach((item) => item.classList.remove("active"));
+        if (activeItem) activeItem.classList.add("active");
+      }
+
+      function getHeaderOffset() {
+        const header = document.getElementById("header");
+        return (header?.offsetHeight || 64) + 12;
+      }
+
+      function smoothScrollWithOffset(targetEl) {
+        if (!targetEl) return;
+        const top =
+          window.pageYOffset +
+          targetEl.getBoundingClientRect().top -
+          getHeaderOffset();
+        window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      }
+
+      function getSchemaJsonUrl(url) {
+        const base = String(url || "").trim();
+        if (!base) return "";
+        if (/[?&]format=/.test(base)) return base;
+        return base + (base.includes("?") ? "&" : "?") + "format=json";
+      }
+
+      function getSpecJson() {
+        try {
+          return (
+            ui.getState().getIn(["spec", "json"])?.toJS?.() ||
+            ui.getState().getIn(["spec", "json"]) ||
+            null
+          );
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function hydrateSpecUi() {
+        const spec = getSpecJson();
+        if (spec) {
+          populateStats(spec);
+          populateSidebar(spec);
+          return;
+        }
+
+        fetch(getSchemaJsonUrl(SCHEMA_URL))
+          .then((r) => r.json())
+          .then((s) => {
+            populateStats(s);
+            populateSidebar(s);
+          })
+          .catch(() => {});
+      }
+
+      function populateStats(spec) {
+        const ver = spec?.info?.version;
+        if (ver) document.getElementById("api-version").textContent = "v" + ver;
+
+        const title = spec?.info?.title;
+        if (title) document.querySelector(".header-title").textContent = title;
+
+        const paths = spec.paths || {};
+        let endpointCount = 0;
+        const tags = new Set();
+
+        Object.values(paths).forEach((pathItem) => {
+          METHODS.forEach((method) => {
+            if (!pathItem?.[method]) return;
+            endpointCount += 1;
+            (pathItem[method].tags || []).forEach((tag) => tags.add(tag));
+          });
+        });
+
+        document.getElementById("stat-endpoints").textContent = endpointCount;
+        document.getElementById("stat-tags").textContent =
+          tags.size || (spec.tags?.length ?? 0);
+        document.getElementById("stat-schemas").textContent = Object.keys(
+          spec.components?.schemas || {},
+        ).length;
+        document.getElementById("stat-auth").textContent = Object.keys(
+          spec.components?.securitySchemes || {},
+        ).length;
+      }
+
+      function populateSidebar(spec) {
+        const container = document.getElementById("sidebar-tags");
+        if (!container) return;
+        container.innerHTML = "";
+
+        const paths = spec.paths || {};
+        const tags = new Set();
+        Object.values(paths).forEach((pathItem) => {
+          METHODS.forEach((method) => {
+            (pathItem?.[method]?.tags || []).forEach((tag) => tags.add(tag));
+          });
+        });
+
+        Array.from(tags)
+          .sort((a, b) => a.localeCompare(b))
+          .forEach((tag) => {
+            const item = document.createElement("a");
+            item.className = "sidebar-item";
+            item.href = "javascript:void(0)";
+            item.dataset.tag = tag;
+            item.innerHTML = `
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                <line x1="7" y1="7" x2="7.01" y2="7"/>
+              </svg>
+              ${tag}
+            `;
+            item.addEventListener("click", (event) => {
+              event.preventDefault();
+              const ok = scrollToTagSection(tag);
+              if (ok) setSidebarActive(item);
+            });
+            container.appendChild(item);
+          });
+      }
+
+      function bindSidebarTagEvents() {
+        if (tagsEventBound) return;
+        const container = document.getElementById("sidebar-tags");
+        if (!container) return;
+
+        container.addEventListener("click", (event) => {
+          const item = event.target.closest(".sidebar-item[data-tag]");
+          if (!item) return;
+          event.preventDefault();
+          const ok = scrollToTagSection(item.dataset.tag || "");
+          if (ok) setSidebarActive(item);
+        });
+
+        tagsEventBound = true;
+      }
+
+      function scrollToTagSection(tagName) {
+        const wanted = normalizeText(tagName);
+        if (!wanted) return false;
+
+        const sections = Array.from(
+          document.querySelectorAll(".swagger-ui .opblock-tag-section"),
+        );
+        const section = sections.find((node) => {
+          const header = node.querySelector(".opblock-tag");
+          return normalizeText(header?.textContent).startsWith(wanted);
+        });
+
+        if (section) {
+          const header = section.querySelector(".opblock-tag");
+          if (header && !section.classList.contains("is-open")) {
+            header.click();
+          }
+          smoothScrollWithOffset(header || section);
+          return true;
+        }
+
+        // Fallback for cases where Swagger markup differs between versions.
+        const headers = Array.from(document.querySelectorAll(".swagger-ui .opblock-tag"));
+        const header = headers.find((node) =>
+          normalizeText(node.textContent).startsWith(wanted),
+        );
+        if (!header) return false;
+        smoothScrollWithOffset(header);
+        return true;
+      }
+
+      function bindSidebarMainLinks() {
+        document.getElementById("all-link")?.addEventListener("click", (event) => {
+          event.preventDefault();
+          const firstTag = document.querySelector(".swagger-ui .opblock-tag");
+          if (firstTag) smoothScrollWithOffset(firstTag);
+          setSidebarActive(event.currentTarget);
+        });
+
+        document
+          .getElementById("models-link")
+          ?.addEventListener("click", (event) => {
+            event.preventDefault();
+            const modelsSection = document.querySelector(".swagger-ui section.models");
+            if (!modelsSection) return;
+
+            const isCollapsed = modelsSection.classList.contains("is-open") === false;
+            const toggleBtn = modelsSection.querySelector("h4");
+            if (toggleBtn && isCollapsed) toggleBtn.click();
+
+            setTimeout(() => {
+              smoothScrollWithOffset(modelsSection);
+            }, 120);
+            setSidebarActive(event.currentTarget);
+          });
+      }
+
+      function getAuthStateObject() {
+        try {
+          const authState = ui.getState()?.get("auth")?.get("authorized");
+          if (!authState) return {};
+          return typeof authState.toJS === "function" ? authState.toJS() : authState;
+        } catch (_) {
+          return {};
+        }
+      }
+
+      function getPrimarySecuritySchemeName() {
+        const schemes = getSpecJson()?.components?.securitySchemes || {};
+        const entries = Object.entries(schemes);
+        if (!entries.length) return "";
+
+        const bearer = entries.find(
+          ([, schema]) =>
+            String(schema?.type || "").toLowerCase() === "http" &&
+            String(schema?.scheme || "").toLowerCase() === "bearer",
+        );
+        return (bearer || entries[0])[0] || "";
+      }
+
+      function hasAuthorizedState() {
+        const authObj = getAuthStateObject();
+        if (Object.keys(authObj).length) return true;
+
+        try {
+          const raw = localStorage.getItem("authorized");
+          if (!raw) return false;
+          const parsed = JSON.parse(raw);
+          return !!parsed && Object.keys(parsed).length > 0;
+        } catch (_) {
+          return false;
+        }
+      }
+
+      function syncAuthUiState() {
+        const authorized = hasAuthorizedState();
+        const label = authorized ? "Authorized" : "Authorize";
+
+        const headerAuthLabel = document.getElementById("header-auth-label");
+        const sidebarAuthLabel = document.getElementById("sidebar-auth-label");
+        const headerAuthBtn = document.getElementById("header-auth-btn");
+
+        if (headerAuthLabel) headerAuthLabel.textContent = label;
+        if (sidebarAuthLabel) sidebarAuthLabel.textContent = label;
+        if (headerAuthBtn) headerAuthBtn.classList.toggle("is-authorized", authorized);
+      }
+
+      function authorizeWithToken(rawToken) {
+        const token = String(rawToken || "").trim().replace(/^Bearer\s+/i, "");
+        if (!token) return false;
+
+        const schemeName = getPrimarySecuritySchemeName();
+        if (!schemeName) return false;
+
+        try {
+          if (typeof ui?.preauthorizeBearer === "function") {
+            ui.preauthorizeBearer(schemeName, token);
+            return true;
+          }
+        } catch (_) {}
+
+        try {
+          if (typeof ui?.preauthorizeApiKey === "function") {
+            ui.preauthorizeApiKey(schemeName, token);
+            return true;
+          }
+        } catch (_) {}
+
+        try {
+          if (ui?.authActions?.authorize) {
+            const schemes = getSpecJson()?.components?.securitySchemes || {};
+            const auth = {};
+            auth[schemeName] = {
+              name: schemeName,
+              schema: schemes[schemeName] || {},
+              value: token,
+            };
+            ui.authActions.authorize(auth);
+            return true;
+          }
+        } catch (_) {}
+
+        return false;
+      }
+
+      function clearAuthorization() {
+        const schemeName = getPrimarySecuritySchemeName();
+        try {
+          if (ui?.authActions?.logout && schemeName) {
+            ui.authActions.logout([schemeName]);
+            return true;
+          }
+        } catch (_) {}
+        try {
+          if (ui?.authActions?.logout) {
+            ui.authActions.logout();
+            return true;
+          }
+        } catch (_) {}
+        return false;
+      }
+
+      function loadLastAuthToken() {
+        try {
+          return localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || "";
+        } catch (_) {
+          return "";
+        }
+      }
+
+      function saveLastAuthToken(token) {
+        try {
+          const normalized = String(token || "").trim();
+          if (!normalized) localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+          else localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, normalized);
+        } catch (_) {}
+      }
+
+      function setAuthStatus(message, tone = "muted") {
+        const status = document.getElementById("custom-auth-status");
+        if (!status) return;
+        status.textContent = message || "";
+        if (tone === "ok") status.style.color = "var(--accent)";
+        else if (tone === "err") status.style.color = "var(--delete)";
+        else status.style.color = "var(--text-muted)";
+      }
+
+      function openCustomAuthModal() {
+        const modal = document.getElementById("custom-auth-modal");
+        const input = document.getElementById("custom-auth-input");
+        const scheme = document.getElementById("custom-auth-scheme");
+        if (!modal || !input) return;
+
+        const schemeName = getPrimarySecuritySchemeName() || "jwtAuth";
+        if (scheme) scheme.textContent = `${schemeName} (http, Bearer)`;
+        input.value = loadLastAuthToken();
+        setAuthStatus("");
+        modal.hidden = false;
+        document.body.style.overflow = "hidden";
+        setTimeout(() => input.focus(), 0);
+      }
+
+      function closeCustomAuthModal() {
+        const modal = document.getElementById("custom-auth-modal");
+        if (!modal) return;
+        modal.hidden = true;
+        document.body.style.overflow = "";
+      }
+
+      function submitCustomAuthModal() {
+        const input = document.getElementById("custom-auth-input");
+        if (!input) return;
+
+        const token = String(input.value || "").trim();
+        if (!token) {
+          setAuthStatus("Token is required.", "err");
+          return;
+        }
+
+        const ok = authorizeWithToken(token);
+        if (!ok) {
+          setAuthStatus("Authorization failed. Check security scheme.", "err");
+          return;
+        }
+
+        saveLastAuthToken(token.replace(/^Bearer\s+/i, ""));
+        setAuthStatus("Authorized.", "ok");
+        syncAuthUiState();
+        setTimeout(closeCustomAuthModal, 220);
+      }
+
+      function clearCustomAuthModal() {
+        const input = document.getElementById("custom-auth-input");
+        if (input) input.value = "";
+        saveLastAuthToken("");
+        clearAuthorization();
+        setAuthStatus("Authorization cleared.", "muted");
+        syncAuthUiState();
+      }
+
+      function bindCustomAuthEvents() {
+        document.getElementById("header-auth-btn")?.addEventListener("click", (e) => {
+          e.preventDefault();
+          openCustomAuthModal();
+        });
+        document.getElementById("auth-link")?.addEventListener("click", (e) => {
+          e.preventDefault();
+          openCustomAuthModal();
+        });
+        document
+          .getElementById("custom-auth-save")
+          ?.addEventListener("click", submitCustomAuthModal);
+        document
+          .getElementById("custom-auth-cancel")
+          ?.addEventListener("click", closeCustomAuthModal);
+        document
+          .getElementById("custom-auth-clear")
+          ?.addEventListener("click", clearCustomAuthModal);
+        document
+          .getElementById("custom-auth-modal")
+          ?.addEventListener("click", (event) => {
+            if (event.target.closest("[data-auth-close='1']")) closeCustomAuthModal();
+          });
+        document
+          .getElementById("custom-auth-input")
+          ?.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              submitCustomAuthModal();
+            }
+          });
+      }
+
+      function loadFavoriteEndpointIds() {
+        try {
+          const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+        } catch (_) {
+          return [];
+        }
+      }
+
+      function persistFavoriteEndpointIds() {
+        try {
+          localStorage.setItem(
+            FAVORITES_STORAGE_KEY,
+            JSON.stringify(Array.from(favoriteEndpoints)),
+          );
+        } catch (_) {}
+      }
+
+      function endpointIdFrom(method, path) {
+        return `${String(method || "").toUpperCase()} ${String(path || "")}`.trim();
+      }
+
+      function parseEndpointId(endpointId) {
+        const value = String(endpointId || "").trim();
+        const index = value.indexOf(" ");
+        if (index === -1) return { method: "", path: value };
+        return {
+          method: value.slice(0, index).toUpperCase(),
+          path: value.slice(index + 1),
+        };
+      }
+
+      function getOpblockEndpointInfo(opblock) {
+        if (!opblock) return null;
+        const summary = opblock.querySelector(".opblock-summary");
+        if (!summary) return null;
+
+        const method = (
+          summary.querySelector(".opblock-summary-method")?.textContent || ""
+        )
+          .trim()
+          .toUpperCase();
+        const path = (
+          summary.querySelector(".opblock-summary-path")?.textContent || ""
+        ).trim();
+        if (!method || !path) return null;
+
+        const endpointId = endpointIdFrom(method, path);
+        if (opblock.dataset.endpointId !== endpointId) {
+          opblock.dataset.endpointId = endpointId;
+          opblock.dataset.endpointMethod = method;
+          opblock.dataset.endpointPath = path;
+        }
+
+        return { endpointId, method, path, summary };
+      }
+
+      function ensureFavoriteToggle(opblock, info) {
+        const summary = info?.summary;
+        if (!summary) return;
+
+        let btn = summary.querySelector(".favorite-toggle");
+        if (!btn) {
+          btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "favorite-toggle";
+          btn.setAttribute("aria-label", "Toggle favorite");
+          summary.appendChild(btn);
+        }
+        if (btn.dataset.endpointId !== info.endpointId) {
+          btn.dataset.endpointId = info.endpointId;
+        }
+
+        const isFavorite = favoriteEndpoints.has(info.endpointId);
+        btn.classList.toggle("is-favorite", isFavorite);
+        btn.textContent = isFavorite ? "★" : "☆";
+      }
+
+      function refreshOpblockFavoritesUi() {
+        document.querySelectorAll(".swagger-ui .opblock").forEach((opblock) => {
+          const info = getOpblockEndpointInfo(opblock);
+          if (!info) return;
+          ensureFavoriteToggle(opblock, info);
+        });
+      }
+
+      function methodBadgeClass(method) {
+        const normalized = String(method || "").toLowerCase();
+        if (normalized === "get") return "badge-get";
+        if (normalized === "post") return "badge-post";
+        if (normalized === "put") return "badge-put";
+        if (normalized === "patch") return "badge-patch";
+        if (normalized === "delete") return "badge-delete";
+        return "badge-get";
+      }
+
+      function scrollToEndpoint(endpointId) {
+        const targetId = String(endpointId || "").trim();
+        if (!targetId) return false;
+
+        const parsed = parseEndpointId(targetId);
+        const opblocks = Array.from(document.querySelectorAll(".swagger-ui .opblock"));
+
+        // Ensure endpoint metadata exists on opblocks before searching.
+        const opblock =
+          opblocks.find((node) => {
+            const info = getOpblockEndpointInfo(node);
+            return info?.endpointId === targetId;
+          }) ||
+          opblocks.find((node) => {
+            const info = getOpblockEndpointInfo(node);
+            if (!info) return false;
+            if (!parsed.path) return false;
+            if (info.path !== parsed.path) return false;
+            if (!parsed.method) return true;
+            return info.method === parsed.method;
+          });
+
+        if (!opblock) return false;
+
+        const section = opblock.closest(".opblock-tag-section");
+        const tagHeader = section?.querySelector(".opblock-tag");
+        if (section && !section.classList.contains("is-open") && tagHeader) {
+          tagHeader.click();
+        }
+
+        smoothScrollWithOffset(opblock);
+        return true;
+      }
+
+      function refreshFavoritesSidebar() {
+        const container = document.getElementById("sidebar-favorites");
+        if (!container) return;
+        container.innerHTML = "";
+
+        const ids = Array.from(favoriteEndpoints).sort((a, b) =>
+          a.localeCompare(b),
+        );
+        if (!ids.length) {
+          container.innerHTML = '<div class="sidebar-empty">No favorites yet</div>';
+          return;
+        }
+
+        ids.forEach((endpointId) => {
+          const { method, path } = parseEndpointId(endpointId);
+          const item = document.createElement("a");
+          item.className = "sidebar-item favorite-item";
+          item.href = "javascript:void(0)";
+          item.dataset.endpointId = endpointId;
+
+          const badge = document.createElement("span");
+          badge.className = `method-badge ${methodBadgeClass(method)}`;
+          badge.textContent = method || "API";
+
+          const pathEl = document.createElement("span");
+          pathEl.className = "favorite-path";
+          pathEl.textContent = path || endpointId;
+
+          item.appendChild(badge);
+          item.appendChild(pathEl);
+          item.addEventListener("click", (event) => {
+            event.preventDefault();
+            const ok = scrollToEndpoint(endpointId);
+            if (ok) setSidebarActive(item);
+          });
+          container.appendChild(item);
+        });
+      }
+
+      function bindFavoritesSidebarEvents() {
+        if (favoritesEventBound) return;
+        const container = document.getElementById("sidebar-favorites");
+        if (!container) return;
+
+        container.addEventListener("click", (event) => {
+          const item = event.target.closest(".sidebar-item[data-endpoint-id]");
+          if (!item) return;
+          event.preventDefault();
+          const ok = scrollToEndpoint(item.dataset.endpointId || "");
+          if (ok) setSidebarActive(item);
+        });
+
+        favoritesEventBound = true;
+      }
+
+      function isCopyCandidateKey(key) {
+        const normalized = normalizeText(key);
+        if (!normalized) return false;
+        if (COPY_EXACT_KEYS.includes(normalized)) return true;
+        return normalized.endsWith("_id");
+      }
+
+      function previewCopyValue(value) {
+        const text = String(value || "");
+        if (text.length <= 42) return text;
+        return `${text.slice(0, 18)}...${text.slice(-14)}`;
+      }
+
+      function collectCopyItems(node, path = "", out = []) {
+        if (out.length >= COPY_MAX_ITEMS) return out;
+
+        if (Array.isArray(node)) {
+          node.slice(0, 10).forEach((item, index) => {
+            const nextPath = path ? `${path}[${index}]` : `[${index}]`;
+            collectCopyItems(item, nextPath, out);
+          });
+          return out;
+        }
+
+        if (!node || typeof node !== "object") return out;
+
+        Object.entries(node).forEach(([key, value]) => {
+          if (out.length >= COPY_MAX_ITEMS) return;
+          const nextPath = path ? `${path}.${key}` : key;
+
+          if (value && typeof value === "object") {
+            collectCopyItems(value, nextPath, out);
+            return;
+          }
+
+          if (
+            (typeof value === "string" || typeof value === "number") &&
+            isCopyCandidateKey(key)
+          ) {
+            out.push({
+              key: normalizeText(key),
+              label: key,
+              path: nextPath,
+              value: String(value),
+            });
+          }
+        });
+
+        return out;
+      }
+
+      function extractQuickCopyItems(rawText) {
+        const text = String(rawText || "").trim();
+        if (!text) return [];
+
+        const dedup = new Set();
+        const items = [];
+        const pushUnique = (item) => {
+          const signature = `${item.path}|${item.value}`;
+          if (dedup.has(signature)) return;
+          dedup.add(signature);
+          items.push(item);
+        };
+
+        try {
+          const parsed = JSON.parse(text);
+          collectCopyItems(parsed).forEach(pushUnique);
+        } catch (_) {
+          const regex =
+            /"([A-Za-z_][A-Za-z0-9_]*)"\s*:\s*("([^"\\]*(?:\\.[^"\\]*)*)"|-?\d+)/g;
+          let match = null;
+          while ((match = regex.exec(text)) && items.length < COPY_MAX_ITEMS) {
+            const key = match[1];
+            if (!isCopyCandidateKey(key)) continue;
+            const rawValue = match[2];
+            const value = rawValue.startsWith('"')
+              ? rawValue.slice(1, -1)
+              : rawValue;
+            pushUnique({ key: normalizeText(key), label: key, path: key, value });
+          }
+        }
+
+        const priority = (key) => {
+          const index = COPY_EXACT_KEYS.indexOf(key);
+          return index === -1 ? 999 : index;
+        };
+
+        items.sort((a, b) => {
+          const diff = priority(a.key) - priority(b.key);
+          if (diff !== 0) return diff;
+          return a.path.localeCompare(b.path);
+        });
+
+        return items.slice(0, COPY_MAX_ITEMS);
+      }
+
+      function renderQuickCopyPanel(opblock, items) {
+        const responseWrap =
+          opblock.querySelector(".responses-wrapper") ||
+          opblock.querySelector(".responses-inner") ||
+          opblock.querySelector(".opblock-body");
+        if (!responseWrap) return;
+
+        const oldPanel = responseWrap.querySelector(".quick-copy-panel");
+        if (oldPanel) oldPanel.remove();
+        if (!items.length) return;
+
+        const panel = document.createElement("div");
+        panel.className = "quick-copy-panel";
+
+        const title = document.createElement("div");
+        title.className = "quick-copy-title";
+        title.textContent = "Quick copy";
+        panel.appendChild(title);
+
+        items.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "quick-copy-row";
+
+          const key = document.createElement("span");
+          key.className = "quick-copy-key";
+          key.textContent = item.label;
+
+          const value = document.createElement("code");
+          value.className = "quick-copy-value";
+          value.textContent = previewCopyValue(item.value);
+          value.title = `${item.path}: ${item.value}`;
+
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "quick-copy-btn";
+          btn.dataset.copyValue = item.value;
+          btn.textContent = "Copy";
+
+          row.append(key, value, btn);
+          panel.appendChild(row);
+        });
+
+        responseWrap.prepend(panel);
+      }
+
+      function scanQuickCopyPanels() {
+        const openBlocks = document.querySelectorAll(".swagger-ui .opblock.is-open");
+        openBlocks.forEach((opblock) => {
+          const responseNodes = opblock.querySelectorAll(
+            ".responses-wrapper pre, .responses-wrapper .microlight, .responses-inner pre",
+          );
+
+          let items = [];
+          for (const node of responseNodes) {
+            items = extractQuickCopyItems(node.textContent || "");
+            if (items.length) break;
+          }
+
+          renderQuickCopyPanel(opblock, items);
+        });
+      }
+
+      async function copyValueToClipboard(text) {
+        const value = String(text || "");
+        if (!value) return false;
+        try {
+          await navigator.clipboard.writeText(value);
+          return true;
+        } catch (_) {
+          const area = document.createElement("textarea");
+          area.value = value;
+          area.setAttribute("readonly", "");
+          area.style.position = "fixed";
+          area.style.opacity = "0";
+          document.body.appendChild(area);
+          area.select();
+          const ok = document.execCommand("copy");
+          area.remove();
+          return ok;
+        }
+      }
+
+      function queueUiEnhancements(delay = 180) {
+        clearTimeout(uiEnhanceTimer);
+        uiEnhanceTimer = setTimeout(() => {
+          refreshOpblockFavoritesUi();
+          refreshFavoritesSidebar();
+          scanQuickCopyPanels();
+          syncAuthUiState();
+        }, delay);
+      }
+
+      function bindSearchFilter() {
+        const input = document.getElementById("search-input");
+        if (!input) return;
+
+        input.addEventListener("input", function () {
+          const query = normalizeText(this.value);
+
+          const swaggerFilter =
+            document.querySelector('.swagger-ui input[type="text"].operation-filter-input') ||
+            document.querySelector('.swagger-ui input[type="text"].filter-input') ||
+            document.querySelector(".swagger-ui .filter-container input[type='text']");
+          if (swaggerFilter) {
+            swaggerFilter.value = query;
+            swaggerFilter.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+
+          document.querySelectorAll(".swagger-ui .opblock").forEach((block) => {
+            const path = normalizeText(
+              block.querySelector(".opblock-summary-path")?.textContent,
+            );
+            const desc = normalizeText(
+              block.querySelector(".opblock-summary-description")?.textContent,
+            );
+            const method = normalizeText(
+              block.querySelector(".opblock-summary-method")?.textContent,
+            );
+            const visible =
+              !query ||
+              path.includes(query) ||
+              desc.includes(query) ||
+              method.includes(query);
+            block.style.display = visible ? "" : "none";
+          });
+
+          queueUiEnhancements(220);
+        });
+      }
+
+      document.addEventListener(
+        "click",
+        (event) => {
+          const swaggerAuthTrigger = event.target.closest(
+            ".swagger-ui .btn.authorize, .swagger-ui .authorization__btn",
+          );
+          if (!swaggerAuthTrigger) return;
+          event.preventDefault();
+          event.stopPropagation();
+          openCustomAuthModal();
+        },
+        true,
+      );
+
+      document.addEventListener("click", async (event) => {
+        const favoriteBtn = event.target.closest(".favorite-toggle");
+        if (favoriteBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          const endpointId = favoriteBtn.dataset.endpointId || "";
+          if (!endpointId) return;
+
+          if (favoriteEndpoints.has(endpointId)) favoriteEndpoints.delete(endpointId);
+          else favoriteEndpoints.add(endpointId);
+          persistFavoriteEndpointIds();
+          queueUiEnhancements(0);
+          return;
+        }
+
+        const copyBtn = event.target.closest(".quick-copy-btn");
+        if (copyBtn) {
+          const ok = await copyValueToClipboard(copyBtn.dataset.copyValue || "");
+          const old = copyBtn.textContent;
+          copyBtn.textContent = ok ? "Copied" : "Failed";
+          setTimeout(() => {
+            copyBtn.textContent = old;
+          }, 1100);
+          return;
+        }
+
+        if (
+          event.target.closest(".swagger-ui .btn.execute") ||
+          event.target.closest(".swagger-ui .try-out__btn") ||
+          event.target.closest(".swagger-ui .opblock-summary") ||
+          event.target.closest(".swagger-ui .opblock-tag")
+        ) {
+          clearTimeout(quickCopyScanTimer);
+          quickCopyScanTimer = setTimeout(() => queueUiEnhancements(80), 260);
+          setTimeout(() => queueUiEnhancements(80), 900);
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closeCustomAuthModal();
+      });
+
+      bindCustomAuthEvents();
+      bindSearchFilter();
+      bindSidebarMainLinks();
+      bindSidebarTagEvents();
+      bindFavoritesSidebarEvents();
+      syncAuthUiState();
+      queueUiEnhancements(300);
+      setTimeout(() => queueUiEnhancements(120), 1200);
+    </script>
+  </body>
+</html>
