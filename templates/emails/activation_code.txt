@@ -1,0 +1,8 @@
+Salom, {{ full_name }}!
+
+{{ project_name }} platformasiga xush kelibsiz.
+Email tasdiqlash kodi: {{ code }}
+
+Kod {{ expires_minutes }} daqiqa davomida amal qiladi.
+
+Agar bu ro'yxatdan o'tish sizniki bo'lmasa, xatni e'tiborsiz qoldiring.
