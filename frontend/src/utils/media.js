@@ -13,6 +13,11 @@ export function resolveMediaUrl(value, options = {}) {
     return defaultProfileUrl(fallbackUserType);
   }
 
+  const filename = value.split('?')[0].split('#')[0].split('/').pop() || '';
+  if (['default_user.png', 'default_client.png', 'default_worker.png'].includes(filename)) {
+    return defaultProfileUrl(fallbackUserType);
+  }
+
   if (value.startsWith('http://') || value.startsWith('https://')) {
     return value;
   }

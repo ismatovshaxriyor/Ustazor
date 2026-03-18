@@ -1,37 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-
-function formatBudget(vacancy) {
-  if (vacancy.price_type === 'negotiable') {
-    return 'Kelishiladi';
-  }
-  const amount = Number(vacancy.price_amount || 0);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return 'Aniq narx';
-  }
-  return `${amount.toLocaleString('uz-UZ')} so'm`;
-}
-
-function formatDate(value) {
-  if (!value) {
-    return 'Sana ko`rsatilmagan';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleDateString('uz-UZ');
-}
+import { formatBudget, formatDate } from '../utils/format';
 
 function VacancyDetailPage() {
+  const navigate = useNavigate();
   const { id } = useParams();
   const { isAuthenticated, user, applyToVacancy, fetchMyProposals } = useAuth();
   const [vacancy, setVacancy] = useState(null);
   const [status, setStatus] = useState({ loading: true, error: '' });
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
   const [alreadyApplied, setAlreadyApplied] = useState(false);
+  const [existingProposal, setExistingProposal] = useState(null);
   const [applyForm, setApplyForm] = useState({
     coverLetter: '',
     proposedPrice: '',
@@ -44,6 +25,7 @@ function VacancyDetailPage() {
     let active = true;
     setStatus({ loading: true, error: '' });
     setAlreadyApplied(false);
+    setExistingProposal(null);
     setApplyStatus({ saving: false, error: '', success: '' });
 
     const vacancyPromise = authApi.getPublicVacancy(id);
@@ -63,8 +45,10 @@ function VacancyDetailPage() {
           ? proposalsData
           : (proposalsData.results || []);
 
-        const isAlreadySent = proposalList.some((item) => Number(item.vacancy_id) === Number(id));
+        const currentProposal = proposalList.find((item) => Number(item.vacancy_id) === Number(id)) || null;
+        const isAlreadySent = Boolean(currentProposal);
         setAlreadyApplied(isAlreadySent);
+        setExistingProposal(currentProposal);
         setStatus({ loading: false, error: '' });
       })
       .catch((error) => {
@@ -101,14 +85,19 @@ function VacancyDetailPage() {
     setApplyStatus({ saving: true, error: '', success: '' });
 
     try {
-      await applyToVacancy(id, {
+      const created = await applyToVacancy(id, {
         cover_letter: applyForm.coverLetter,
         proposed_price: applyForm.proposedPrice ? applyForm.proposedPrice : null,
       });
       setAlreadyApplied(true);
+      setExistingProposal(created);
       setApplyForm({ coverLetter: '', proposedPrice: '' });
-      setApplyStatus({ saving: false, error: '', success: 'Murojaatingiz yuborildi.' });
+      setApplyStatus({ saving: false, error: '', success: 'Murojaatingiz yuborildi. Chatga yo`naltirilmoqda...' });
       setIsApplyModalOpen(false);
+
+      if (created?.chat_thread_id) {
+        navigate(`/chat/${created.chat_thread_id}`);
+      }
     } catch (error) {
       setApplyStatus({
         saving: false,
@@ -171,10 +160,15 @@ function VacancyDetailPage() {
           <button
             className="button button-primary full-width"
             type="button"
-            disabled={alreadyApplied}
-            onClick={openApplyModal}
+            onClick={() => {
+              if (alreadyApplied && existingProposal?.chat_thread_id) {
+                navigate(`/chat/${existingProposal.chat_thread_id}`);
+                return;
+              }
+              openApplyModal();
+            }}
           >
-            {alreadyApplied ? 'Murojaat yuborilgan' : 'Murojaat qilish'}
+            {alreadyApplied ? 'Chatni ochish' : 'Murojaat qilish'}
           </button>
         ) : isAuthenticated ? (
           <p className="muted">Murojaat yuborish faqat usta akkaunti uchun ochiq.</p>

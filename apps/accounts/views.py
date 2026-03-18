@@ -12,6 +12,7 @@ from rest_framework_simplejwt.views import (
 )
 
 from apps.accounts.serializers import (
+    DEFAULT_PROFILE_FILENAMES,
     CustomTokenObtainPairSerializer,
     MeProfileSerializer,
     WorkerPublicDetailSerializer,
@@ -264,7 +265,10 @@ class WorkerDashboardView(APIView):
         completion_checks = [
             bool(user.full_name),
             bool(user.phone_number),
-            bool(user.profile_photo and user.profile_photo.name not in {'default_user.png', '/default_user.png'}),
+            bool(
+                user.profile_photo
+                and (user.profile_photo.name or '').rsplit('/', maxsplit=1)[-1] not in DEFAULT_PROFILE_FILENAMES
+            ),
             bool(profile.specialization),
             bool(profile.service_city),
             bool(profile.about),

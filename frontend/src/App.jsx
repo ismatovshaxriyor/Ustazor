@@ -33,6 +33,7 @@ function App() {
         <Route path="/become-master" element={<BecomeMasterPage />} />
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/chat/:threadId" element={<ChatPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/auth" element={<Navigate to="/auth/login" replace />} />
         <Route path="/auth/login" element={<LoginPage />} />

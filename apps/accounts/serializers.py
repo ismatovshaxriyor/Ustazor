@@ -23,6 +23,22 @@ from apps.accounts.services.activation import (
 User = get_user_model()
 
 
+DEFAULT_PROFILE_FILENAMES = {'default_client.png', 'default_worker.png'}
+
+
+def _profile_photo_filename(user) -> str:
+    if not getattr(user, 'profile_photo', None):
+        return ''
+    name = (user.profile_photo.name or '').strip()
+    if not name:
+        return ''
+    return name.rsplit('/', maxsplit=1)[-1]
+
+
+def _is_default_profile_photo(user) -> bool:
+    return _profile_photo_filename(user) in DEFAULT_PROFILE_FILENAMES
+
+
 def _default_profile_photo_url(user, request=None) -> str:
     default_path = static('image/default_worker.png')
     if user.user_type == USER_TYPE_CHOICES.client:
@@ -37,8 +53,7 @@ def _profile_photo_url(user, request=None) -> str:
     if not user.profile_photo:
         return _default_profile_photo_url(user, request=request)
 
-    filename = user.profile_photo.name.rsplit('/', maxsplit=1)[-1]
-    if filename in {'default_user.png', 'default_client.png', 'default_worker.png'}:
+    if _is_default_profile_photo(user):
         return _default_profile_photo_url(user, request=request)
 
     try:
@@ -149,6 +164,12 @@ class MeProfileSerializer(serializers.ModelSerializer):
 
     def get_profile_photo_url(self, obj) -> str:
         return _profile_photo_url(obj, self.context.get('request'))
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if _is_default_profile_photo(instance):
+            data['profile_photo'] = None
+        return data
 
 
 class WorkerProfileSerializer(serializers.ModelSerializer):

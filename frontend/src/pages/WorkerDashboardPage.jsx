@@ -1,21 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { PROPOSAL_STATUS_LABELS } from '../utils/format';
 
 function formatProposalStatus(status) {
-  if (status === 'pending') {
-    return 'Kutilmoqda';
-  }
-  if (status === 'accepted') {
-    return 'Qabul qilingan';
-  }
-  if (status === 'rejected') {
-    return 'Rad etilgan';
-  }
-  if (status === 'withdrawn') {
-    return 'Bekor qilingan';
-  }
-  return status;
+  return PROPOSAL_STATUS_LABELS[status] || status;
 }
 
 function WorkerDashboardPage() {
@@ -151,9 +140,15 @@ function WorkerDashboardPage() {
                   <p className="muted">{proposal.vacancy_city || 'Shahar kiritilmagan'}</p>
                   <div className="snippet-meta">
                     <span className="pill">{formatProposalStatus(proposal.status)}</span>
-                    <Link to={`/elonlar/${proposal.vacancy_id}`} className="button button-ghost">
-                      Ko`rish
-                    </Link>
+                    {proposal.chat_thread_id ? (
+                      <Link to={`/chat/${proposal.chat_thread_id}`} className="button button-ghost">
+                        Chat
+                      </Link>
+                    ) : (
+                      <Link to={`/elonlar/${proposal.vacancy_id}`} className="button button-ghost">
+                        Ko`rish
+                      </Link>
+                    )}
                   </div>
                 </article>
               ))}

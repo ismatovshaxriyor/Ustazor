@@ -120,11 +120,16 @@ class VacancyProposalApiTests(APITestCase):
             worker=self.worker_user,
             cover_letter='Qabul qilsangiz bo`ladi',
         )
+        second_proposal = VacancyProposal.objects.create(
+            vacancy=self.vacancy,
+            worker=self.worker_two,
+            cover_letter='Ikkinchi usta murojaati',
+        )
         self.client.force_authenticate(user=self.client_user)
 
         list_response = self.client.get(reverse('received_proposals'))
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(list_response.data['results']), 1)
+        self.assertEqual(len(list_response.data['results']), 2)
 
         patch_response = self.client.patch(
             reverse('proposal_status_update', kwargs={'pk': proposal.id}),
@@ -133,4 +138,10 @@ class VacancyProposalApiTests(APITestCase):
         )
         self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
         proposal.refresh_from_db()
+        second_proposal.refresh_from_db()
+        self.vacancy.refresh_from_db()
+
         self.assertEqual(proposal.status, PROPOSAL_STATUS_CHOICES.accepted)
+        self.assertEqual(second_proposal.status, PROPOSAL_STATUS_CHOICES.rejected)
+        self.assertEqual(self.vacancy.status, ORDER_STATUS_CHOICES.in_progress)
+        self.assertEqual(self.vacancy.assigned_worker_id, self.worker_user.id)

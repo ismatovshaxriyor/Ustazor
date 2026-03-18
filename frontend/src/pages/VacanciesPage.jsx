@@ -1,34 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { authApi } from '../api/client';
-
-function formatBudget(vacancy) {
-  if (vacancy.price_type === 'negotiable') {
-    return 'Kelishiladi';
-  }
-
-  const amount = Number(vacancy.price_amount || 0);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return 'Aniq narx';
-  }
-
-  return `${amount.toLocaleString('uz-UZ')} so'm`;
-}
-
-function formatDate(value) {
-  if (!value) {
-    return 'Sana ko`rsatilmagan';
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleDateString('uz-UZ');
-}
-
-function normalizeListResponse(data) {
-  return Array.isArray(data) ? data : (data.results || []);
-}
+import { formatBudget, formatDate, normalizeListResponse } from '../utils/format';
 
 function VacanciesPage() {
   const [searchParams, setSearchParams] = useSearchParams();

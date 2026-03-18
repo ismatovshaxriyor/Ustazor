@@ -7,6 +7,7 @@ from apps.proposals.models import PROPOSAL_STATUS_CHOICES, VacancyProposal
 class VacancyProposalCreateSerializer(serializers.ModelSerializer):
     vacancy_id = serializers.IntegerField(source='vacancy.id', read_only=True)
     vacancy_title = serializers.CharField(source='vacancy.title', read_only=True)
+    chat_thread_id = serializers.IntegerField(source='chat_thread.id', read_only=True, allow_null=True)
 
     class Meta:
         model = VacancyProposal
@@ -14,6 +15,7 @@ class VacancyProposalCreateSerializer(serializers.ModelSerializer):
             'id',
             'vacancy_id',
             'vacancy_title',
+            'chat_thread_id',
             'cover_letter',
             'proposed_price',
             'status',
@@ -52,8 +54,11 @@ class VacancyProposalSerializer(serializers.ModelSerializer):
     vacancy_id = serializers.IntegerField(source='vacancy.id', read_only=True)
     vacancy_title = serializers.CharField(source='vacancy.title', read_only=True)
     vacancy_city = serializers.CharField(source='vacancy.city', read_only=True)
+    chat_thread_id = serializers.IntegerField(source='chat_thread.id', read_only=True, allow_null=True)
     client_name = serializers.CharField(source='vacancy.client.full_name', read_only=True)
+    worker_user_id = serializers.IntegerField(source='worker.id', read_only=True)
     worker_name = serializers.CharField(source='worker.full_name', read_only=True)
+    worker_phone = serializers.CharField(source='worker.phone_number', read_only=True)
 
     class Meta:
         model = VacancyProposal
@@ -62,8 +67,11 @@ class VacancyProposalSerializer(serializers.ModelSerializer):
             'vacancy_id',
             'vacancy_title',
             'vacancy_city',
+            'chat_thread_id',
             'client_name',
+            'worker_user_id',
             'worker_name',
+            'worker_phone',
             'cover_letter',
             'proposed_price',
             'status',

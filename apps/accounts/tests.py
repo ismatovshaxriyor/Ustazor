@@ -210,6 +210,7 @@ class AuthApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('/static/image/default_client.png', response.data['profile_photo_url'])
+        self.assertIsNone(response.data.get('profile_photo'))
 
     def test_me_returns_default_worker_photo_when_no_uploaded_photo(self):
         login_response = self.client.post(
@@ -224,6 +225,7 @@ class AuthApiTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('/static/image/default_worker.png', response.data['profile_photo_url'])
+        self.assertIsNone(response.data.get('profile_photo'))
 
     def test_me_patch_updates_profile(self):
         login_response = self.client.post(

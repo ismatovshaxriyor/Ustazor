@@ -26,6 +26,10 @@ SPECTACULAR_SETTINGS = {
             'name': 'Proposals',
             'description': 'Ustalarning e`lonlarga murojaatlari va mijozning murojaatlarni boshqarishi.',
         },
+        {
+            'name': 'Chat',
+            'description': 'Mijoz va usta o`rtasidagi suhbatlar va chat orqali qabul qilish jarayoni.',
+        },
     ],
     "SERVE_INCLUDE_SCHEMA": False,
 }

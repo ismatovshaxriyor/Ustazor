@@ -15,7 +15,7 @@ export function AuthProvider({ children }) {
 
   const isAuthenticated = Boolean(tokens.access);
 
-  const login = async ({ email, password }) => {
+  const login = useCallback(async ({ email, password }) => {
     const data = await authApi.login({ email, password });
 
     localStorage.setItem(ACCESS_KEY, data.access);
@@ -25,9 +25,9 @@ export function AuthProvider({ children }) {
     setUser(data.user || { email });
 
     return data;
-  };
+  }, []);
 
-  const register = async ({ fullName, email, password, phoneNumber, userType }) => {
+  const register = useCallback(async ({ fullName, email, password, phoneNumber, userType }) => {
     return authApi.register({
       full_name: fullName,
       email,
@@ -35,15 +35,15 @@ export function AuthProvider({ children }) {
       phone_number: phoneNumber,
       user_type: userType,
     });
-  };
+  }, []);
 
-  const verifyEmail = async ({ email, code }) => {
+  const verifyEmail = useCallback(async ({ email, code }) => {
     return authApi.verifyEmail({ email, code });
-  };
+  }, []);
 
-  const resendActivation = async ({ email }) => {
+  const resendActivation = useCallback(async ({ email }) => {
     return authApi.resendActivation({ email });
-  };
+  }, []);
 
   const fetchMe = useCallback(async () => {
     if (!tokens.access) {
@@ -195,6 +195,10 @@ export function AuthProvider({ children }) {
       tokens,
       user,
       isAuthenticated,
+      login,
+      register,
+      verifyEmail,
+      resendActivation,
       fetchMe,
       updateMe,
       fetchWorkerProfile,

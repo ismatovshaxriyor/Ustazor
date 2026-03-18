@@ -2,27 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { authApi } from '../api/client';
 import { resolveMediaUrl } from '../utils/media';
-
-function formatMoney(value) {
-  const amount = Number(value || 0);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return 'Kelishiladi';
-  }
-  return `${amount.toLocaleString('uz-UZ')} so'mdan`;
-}
-
-function formatSkillPrice(skill) {
-  const min = Number(skill.min_price || 0);
-  const max = Number(skill.max_price || 0);
-
-  if (min > 0 && max > 0) {
-    return `${min.toLocaleString('uz-UZ')} - ${max.toLocaleString('uz-UZ')} so'm`;
-  }
-  if (min > 0) {
-    return `${min.toLocaleString('uz-UZ')} so'mdan`;
-  }
-  return 'Kelishiladi';
-}
+import { formatMoney, formatSkillPrice } from '../utils/format';
 
 function MasterProfilePage() {
   const { id } = useParams();

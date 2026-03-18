@@ -2,27 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { resolveMediaUrl } from '../utils/media';
-
-function formatMoney(value) {
-  const amount = Number(value || 0);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return 'Kelishiladi';
-  }
-  return `${amount.toLocaleString('uz-UZ')} so'm`;
-}
-
-function formatKonikmaPrice(konikma) {
-  const min = Number(konikma.min_price || 0);
-  const max = Number(konikma.max_price || 0);
-
-  if (min > 0 && max > 0) {
-    return `${min.toLocaleString('uz-UZ')} - ${max.toLocaleString('uz-UZ')} so'm`;
-  }
-  if (min > 0) {
-    return `${min.toLocaleString('uz-UZ')} so'm dan boshlab`;
-  }
-  return 'Kelishiladi';
-}
+import { formatMoney, formatSkillPrice as formatKonikmaPrice } from '../utils/format';
 
 const konikmaInitialForm = {
   title: '',

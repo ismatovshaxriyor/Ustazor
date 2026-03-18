@@ -1,18 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { authApi } from '../api/client';
-
-function formatMoney(value) {
-  const amount = Number(value || 0);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return 'Kelishiladi';
-  }
-  return `${amount.toLocaleString('uz-UZ')} so'mdan`;
-}
-
-function normalizeListResponse(data) {
-  return Array.isArray(data) ? data : (data.results || []);
-}
+import { formatMoney, normalizeListResponse } from '../utils/format';
 
 function MastersPage() {
   const [searchParams, setSearchParams] = useSearchParams();

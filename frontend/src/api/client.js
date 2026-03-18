@@ -301,4 +301,47 @@ export const authApi = {
       body: JSON.stringify({ status }),
     });
   },
+  listChatThreads(accessToken) {
+    return request('/api/chat/threads/', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  },
+  listChatMessages(threadId, accessToken) {
+    return request(`/api/chat/threads/${threadId}/messages/`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  },
+  sendChatMessage(threadId, payload, accessToken) {
+    return request(`/api/chat/threads/${threadId}/messages/`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+  },
+  acceptChatWorker(threadId, accessToken) {
+    return request(`/api/chat/threads/${threadId}/accept-worker/`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({}),
+    });
+  },
+  rejectChatWorker(threadId, accessToken) {
+    return request(`/api/chat/threads/${threadId}/reject-worker/`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({}),
+    });
+  },
 };

@@ -1,27 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-
-const statusLabels = {
-  open: 'Yangi',
-  in_progress: 'Jarayonda',
-  completed: 'Yakunlangan',
-  cancelled: 'Bekor qilingan',
-};
-
-function formatPrice(order) {
-  if (order.price_type === 'negotiable') {
-    return 'Kelishiladi';
-  }
-
-  const amount = Number(order.price_amount || 0);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return 'Aniq narx';
-  }
-
-  return `${amount.toLocaleString('uz-UZ')} so'm`;
-}
+import { formatBudget as formatPrice, STATUS_LABELS as statusLabels } from '../utils/format';
 
 function OrdersPage() {
   const { isAuthenticated, tokens } = useAuth();
@@ -42,7 +23,7 @@ function OrdersPage() {
     success: '',
   });
 
-  const loadOrders = async (statusValue = '') => {
+  const loadOrders = useCallback(async (statusValue = '') => {
     if (!tokens.access) {
       return;
     }
@@ -60,14 +41,14 @@ function OrdersPage() {
         error: error.message || 'Buyurtmalarni yuklab bo`lmadi.',
       }));
     }
-  };
+  }, [tokens.access]);
 
   useEffect(() => {
     if (!isAuthenticated) {
       return;
     }
     loadOrders(filterStatus);
-  }, [isAuthenticated, tokens.access, filterStatus]);
+  }, [isAuthenticated, loadOrders, filterStatus]);
 
   const updateField = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
@@ -164,6 +145,7 @@ function OrdersPage() {
             </label>
             <textarea
               id="order-description"
+              className="input"
               rows={4}
               value={form.description}
               onChange={updateField('description')}

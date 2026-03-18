@@ -29,6 +29,7 @@ urlpatterns = [
     path('api/vacancies/', include('apps.jobs.public_urls')),
     path('api/vacancies/', include('apps.proposals.vacancy_urls')),
     path('api/proposals/', include('apps.proposals.urls')),
+    path('api/chat/', include('apps.chat.urls')),
 
     path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', CustomTokenRefreshView.as_view(), name='token_refresh'),

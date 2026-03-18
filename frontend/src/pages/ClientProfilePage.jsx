@@ -3,6 +3,11 @@ import { Link, Navigate } from 'react-router-dom';
 import { authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { resolveMediaUrl } from '../utils/media';
+import {
+  formatBudget as formatPrice,
+  STATUS_LABELS as statusLabels,
+  PROPOSAL_STATUS_LABELS as proposalStatusLabels,
+} from '../utils/format';
 
 const vacancyInitialForm = {
   title: '',
@@ -15,31 +20,17 @@ const vacancyInitialForm = {
   priceAmount: '',
 };
 
-const statusLabels = {
-  open: 'Yangi',
-  in_progress: 'Jarayonda',
-  completed: 'Yakunlangan',
-  cancelled: 'Bekor qilingan',
-};
-
-function formatPrice(order) {
-  if (order.price_type === 'negotiable') {
-    return 'Kelishiladi';
-  }
-  const amount = Number(order.price_amount || 0);
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return 'Aniq narx';
-  }
-  return `${amount.toLocaleString('uz-UZ')} so'm`;
-}
-
 function ClientProfilePage() {
   const { isAuthenticated, fetchMe, tokens, user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [receivedProposals, setReceivedProposals] = useState([]);
   const [status, setStatus] = useState({ loading: true, error: '' });
   const [ordersStatus, setOrdersStatus] = useState({ loading: true, error: '' });
+  const [proposalsStatus, setProposalsStatus] = useState({ loading: true, error: '' });
   const [isVacancyModalOpen, setIsVacancyModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
   const [vacancyForm, setVacancyForm] = useState(vacancyInitialForm);
   const [vacancyStatus, setVacancyStatus] = useState({ saving: false, error: '', success: '' });
 
@@ -51,17 +42,21 @@ function ClientProfilePage() {
     let active = true;
     const profilePromise = user ? Promise.resolve(user) : fetchMe();
     const ordersPromise = tokens.access ? authApi.listOrders(tokens.access) : Promise.resolve([]);
+    const proposalsPromise = tokens.access ? authApi.listReceivedProposals(tokens.access) : Promise.resolve([]);
 
-    Promise.all([profilePromise, ordersPromise])
-      .then(([me, ordersData]) => {
+    Promise.all([profilePromise, ordersPromise, proposalsPromise])
+      .then(([me, ordersData, proposalsData]) => {
         if (!active) {
           return;
         }
         const normalizedOrders = Array.isArray(ordersData) ? ordersData : (ordersData.results || []);
+        const normalizedProposals = Array.isArray(proposalsData) ? proposalsData : (proposalsData.results || []);
         setProfile(me);
         setOrders(normalizedOrders);
+        setReceivedProposals(normalizedProposals);
         setStatus({ loading: false, error: '' });
         setOrdersStatus({ loading: false, error: '' });
+        setProposalsStatus({ loading: false, error: '' });
       })
       .catch((error) => {
         if (!active) {
@@ -74,6 +69,10 @@ function ClientProfilePage() {
         setOrdersStatus({
           loading: false,
           error: error.message || 'E`lonlarni yuklab bo`lmadi.',
+        });
+        setProposalsStatus({
+          loading: false,
+          error: error.message || 'Murojaatlarni yuklab bo`lmadi.',
         });
       });
 
@@ -94,6 +93,28 @@ function ClientProfilePage() {
   const closeVacancyModal = () => {
     setIsVacancyModalOpen(false);
   };
+
+  const openProposalModal = (order) => {
+    setSelectedOrder(order);
+    setIsProposalModalOpen(true);
+  };
+
+  const closeProposalModal = () => {
+    setIsProposalModalOpen(false);
+    setSelectedOrder(null);
+  };
+
+  const proposalsForSelectedOrder = selectedOrder
+    ? receivedProposals.filter((proposal) => proposal.vacancy_id === selectedOrder.id)
+    : [];
+
+  const proposalCountByOrder = receivedProposals.reduce((acc, proposal) => {
+    if (!acc[proposal.vacancy_id]) {
+      acc[proposal.vacancy_id] = 0;
+    }
+    acc[proposal.vacancy_id] += 1;
+    return acc;
+  }, {});
 
   const onCreateVacancy = async (event) => {
     event.preventDefault();
@@ -222,13 +243,70 @@ function ClientProfilePage() {
                   {order.category || 'Yo`nalish berilmagan'} · {order.city || 'Shahar berilmagan'}
                 </p>
                 <p className="price">{formatPrice(order)}</p>
+                <div className="snippet-meta">
+                  <p className="muted">
+                    Murojaatlar: {proposalCountByOrder[order.id] || 0}
+                  </p>
+                  <button
+                    type="button"
+                    className="button button-ghost"
+                    onClick={() => openProposalModal(order)}
+                  >
+                    Murojaatlarni ko`rish
+                  </button>
+                </div>
               </article>
             ))}
           </div>
         )}
 
         {ordersStatus.error && <p className="form-message error">{ordersStatus.error}</p>}
+        {proposalsStatus.error && <p className="form-message error">{proposalsStatus.error}</p>}
       </article>
+
+      {isProposalModalOpen && (
+        <div className="modal-backdrop" onClick={closeProposalModal} role="presentation">
+          <article className="modal-card card" onClick={(event) => event.stopPropagation()}>
+            <div className="section-row-head">
+              <h3>{selectedOrder ? `${selectedOrder.title} uchun murojaatlar` : 'Murojaatlar'}</h3>
+              <button type="button" className="button button-ghost" onClick={closeProposalModal}>
+                Yopish
+              </button>
+            </div>
+            <p className="muted">Ustani qabul qilish chat ichidan amalga oshiriladi.</p>
+
+            {proposalsForSelectedOrder.length === 0 ? (
+              <p className="muted">Bu e`lon uchun hozircha murojaat yo`q.</p>
+            ) : (
+              <div className="stack-small">
+                {proposalsForSelectedOrder.map((proposal) => (
+                  <article key={proposal.id} className="order-item">
+                    <div className="order-item-head">
+                      <h4>{proposal.worker_name || 'Usta'}</h4>
+                      <span className={`status-pill status-${proposal.status}`}>
+                        {proposalStatusLabels[proposal.status] || proposal.status}
+                      </span>
+                    </div>
+                    <p className="muted">{proposal.worker_phone || 'Telefon ko`rsatilmagan'}</p>
+                    <p>{proposal.cover_letter || 'Murojaat xati kiritilmagan.'}</p>
+                    <p className="price">
+                      Taklif narxi: {proposal.proposed_price ? `${Number(proposal.proposed_price).toLocaleString('uz-UZ')} so'm` : 'Kelishiladi'}
+                    </p>
+
+                    {proposal.chat_thread_id ? (
+                      <div className="modal-actions">
+                        <Link to={`/chat/${proposal.chat_thread_id}`} className="button button-primary">
+                          Chatni ochish
+                        </Link>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+            )}
+          </article>
+        </div>
+      )}
 
       {isVacancyModalOpen && (
         <div className="modal-backdrop" onClick={closeVacancyModal} role="presentation">

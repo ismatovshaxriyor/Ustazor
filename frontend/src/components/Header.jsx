@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { UserRound } from 'lucide-react';
+import { LogOut, Menu, MessageCircle, UserRound, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { resolveMediaUrl } from '../utils/media';
 
 const baseNavItems = [
@@ -14,12 +16,16 @@ function Header() {
   const location = useLocation();
   const isHome = location.pathname === '/';
   const { isAuthenticated, logout, user } = useAuth();
+  const { unreadCount } = useNotifications();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navItems = [...baseNavItems];
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return (
     <header className={`site-header${isHome ? ' site-header-home' : ''}`}>
       <div className="container header-inner">
-        <NavLink to="/" className="brand">
+        <NavLink to="/" className="brand" onClick={closeMobileMenu}>
           <span className="brand-logo-wrap">
             <img
               src="/brand/logo-transparent.png"
@@ -33,7 +39,16 @@ function Header() {
           </span>
         </NavLink>
 
-        <nav className="main-nav" aria-label="Main navigation">
+        <button
+          type="button"
+          className="mobile-menu-toggle header-icon-action"
+          aria-label={mobileMenuOpen ? 'Menyuni yopish' : 'Menyuni ochish'}
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+        >
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+
+        <nav className={`main-nav${mobileMenuOpen ? ' mobile-open' : ''}`} aria-label="Main navigation">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -41,37 +56,55 @@ function Header() {
               className={({ isActive }) =>
                 `nav-link${isActive ? ' nav-link-active' : ''}`
               }
+              onClick={closeMobileMenu}
             >
               {item.label}
             </NavLink>
           ))}
         </nav>
 
-        <div className="header-actions">
+        <div className={`header-actions${mobileMenuOpen ? ' mobile-open' : ''}`}>
           {isAuthenticated ? (
             <>
-              <NavLink to="/profile" className="user-chip">
+              <NavLink
+                to="/profile"
+                className="header-icon-action"
+                aria-label="Profil"
+                title="Profil"
+                onClick={closeMobileMenu}
+              >
                 {user?.profile_photo_url || user?.profile_photo ? (
                   <img
                     src={resolveMediaUrl(user.profile_photo_url || user.profile_photo, { userType: user?.user_type })}
                     alt="Profil rasmi"
-                    className="user-chip-avatar"
+                    className="header-icon-avatar"
                   />
                 ) : (
-                  <UserRound size={14} />
+                  <UserRound size={18} />
                 )}
-                {user?.full_name || user?.email || 'Foydalanuvchi'}
               </NavLink>
-              <button className="button button-ghost" onClick={logout} type="button">
-                Chiqish
+              <NavLink to="/chat" className="header-icon-action header-chat-icon" aria-label="Chat" title="Chat" onClick={closeMobileMenu}>
+                <MessageCircle size={18} />
+                {unreadCount > 0 && (
+                  <span className="header-unread-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                )}
+              </NavLink>
+              <button
+                className="header-icon-action"
+                onClick={() => { logout(); closeMobileMenu(); }}
+                type="button"
+                aria-label="Chiqish"
+                title="Chiqish"
+              >
+                <LogOut size={18} />
               </button>
             </>
           ) : (
             <>
-              <NavLink to="/auth/login" className="button button-ghost">
+              <NavLink to="/auth/login" className="button button-ghost" onClick={closeMobileMenu}>
                 Kirish
               </NavLink>
-              <NavLink to="/auth/register" className="button button-primary">
+              <NavLink to="/auth/register" className="button button-primary" onClick={closeMobileMenu}>
                 Ro'yxatdan o'tish
               </NavLink>
             </>
@@ -83,3 +116,4 @@ function Header() {
 }
 
 export default Header;
+

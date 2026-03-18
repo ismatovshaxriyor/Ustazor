@@ -3,9 +3,13 @@ from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions
 from rest_framework.exceptions import PermissionDenied
 
+from apps.chat.models import CHAT_MESSAGE_VISIBILITY_CHOICES, ChatMessage
+from apps.chat.realtime import broadcast_chat_message, broadcast_thread_update
+from apps.chat.serializers import ChatMessageSerializer
 from apps.accounts.models import USER_TYPE_CHOICES
 from apps.jobs.models import JobOrder, ORDER_STATUS_CHOICES
 from apps.proposals.models import PROPOSAL_STATUS_CHOICES, VacancyProposal
+from apps.proposals.services import accept_proposal, reject_proposal
 from apps.proposals.serializers import (
     ProposalStatusUpdateSerializer,
     VacancyProposalCreateSerializer,
@@ -41,7 +45,31 @@ class VacancyProposalCreateView(generics.CreateAPIView):
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        serializer.save()
+        proposal = serializer.save()
+
+        from apps.chat.models import ChatThread
+
+        thread, _ = ChatThread.objects.get_or_create(
+            proposal=proposal,
+            defaults={
+                'vacancy': proposal.vacancy,
+                'client': proposal.vacancy.client,
+                'worker': proposal.worker,
+            },
+        )
+
+        message_text = (proposal.cover_letter or '').strip()
+        if not message_text:
+            message_text = "Assalomu alaykum, ushbu e`lon bo`yicha murojaat yubordim."
+        if proposal.proposed_price:
+            message_text = f"{message_text}\nTaklif narxi: {proposal.proposed_price} so`m"
+
+        first_message = ChatMessage.objects.create(
+            thread=thread,
+            sender=proposal.worker,
+            body=message_text,
+        )
+        broadcast_chat_message(thread.id, ChatMessageSerializer(first_message).data)
 
 
 @extend_schema(tags=['Proposals'], summary='Ustaning yuborgan murojaatlari ro`yxati')
@@ -90,6 +118,35 @@ class ProposalStatusUpdateView(generics.UpdateAPIView):
 
     def perform_update(self, serializer):
         instance = self.get_object()
-        if instance.status != PROPOSAL_STATUS_CHOICES.pending:
-            raise PermissionDenied("Faqat kutilayotgan murojaatni yangilash mumkin.")
-        serializer.save()
+        next_status = serializer.validated_data['status']
+
+        if next_status == PROPOSAL_STATUS_CHOICES.accepted:
+            updated = accept_proposal(instance)
+            notification_text = "Mijoz ushbu e`lon bo`yicha murojaatingizni qabul qildi."
+        else:
+            updated = reject_proposal(instance)
+            notification_text = "Mijoz ushbu e`lon bo`yicha murojaatingizni rad etdi."
+
+        serializer.instance = updated
+
+        thread = getattr(updated, 'chat_thread', None)
+        if thread is not None:
+            visibility = CHAT_MESSAGE_VISIBILITY_CHOICES.all
+            if next_status == PROPOSAL_STATUS_CHOICES.accepted:
+                visibility = CHAT_MESSAGE_VISIBILITY_CHOICES.worker_only
+            system_message = ChatMessage.objects.create(
+                thread=thread,
+                sender=self.request.user,
+                body=notification_text,
+                is_system=True,
+                visibility=visibility,
+            )
+            broadcast_chat_message(thread.id, ChatMessageSerializer(system_message).data)
+            broadcast_thread_update(
+                thread.id,
+                {
+                    'proposal_status': updated.status,
+                    'vacancy_status': updated.vacancy.status,
+                    'assigned_worker_id': updated.vacancy.assigned_worker_id,
+                },
+            )

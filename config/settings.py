@@ -1,4 +1,5 @@
 import os
+import importlib.util
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -10,6 +11,9 @@ load_dotenv()
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+HAS_CHANNELS = importlib.util.find_spec("channels") is not None
+HAS_DAPHNE = importlib.util.find_spec("daphne") is not None
+HAS_CHANNELS_REDIS = importlib.util.find_spec("channels_redis") is not None
 
 
 def env_int(key: str, default: int) -> int:
@@ -94,7 +98,12 @@ THIRD_PARTY_APPS = [
 
 # Application definition
 
-INSTALLED_APPS = [
+INSTALLED_APPS = []
+
+if HAS_DAPHNE:
+    INSTALLED_APPS.append('daphne')
+
+INSTALLED_APPS += [
     'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -102,10 +111,13 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
-    *MY_APPS,
-    *THIRD_PARTY_APPS,
 ]
+
+INSTALLED_APPS += MY_APPS
+INSTALLED_APPS += THIRD_PARTY_APPS
+
+if HAS_CHANNELS:
+    INSTALLED_APPS.append('channels')
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -119,6 +131,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'config.urls'
+ASGI_APPLICATION = 'config.asgi.application'
 
 TEMPLATES = [
     {
@@ -189,3 +202,20 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+if HAS_CHANNELS:
+    if REDIS_URL and HAS_CHANNELS_REDIS:
+        CHANNEL_LAYERS = {
+            'default': {
+                'BACKEND': 'channels_redis.core.RedisChannelLayer',
+                'CONFIG': {
+                    'hosts': [REDIS_URL],
+                },
+            }
+        }
+    else:
+        CHANNEL_LAYERS = {
+            'default': {
+                'BACKEND': 'channels.layers.InMemoryChannelLayer',
+            }
+        }

@@ -1,5 +1,6 @@
 import Header from './Header';
 import Footer from './Footer';
+import ToastContainer from './ToastContainer';
 import { useLocation } from 'react-router-dom';
 
 function AppShell({ children }) {
@@ -12,6 +13,7 @@ function AppShell({ children }) {
       <Header />
       <main className={mainClassName}>{children}</main>
       <Footer />
+      <ToastContainer />
     </div>
   );
 }
