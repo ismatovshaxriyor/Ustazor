@@ -6,6 +6,8 @@ from apps.jobs.models import JobOrder, ORDER_STATUS_CHOICES, PRICE_TYPE_CHOICES
 class JobOrderSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source='client.full_name', read_only=True)
     client_email = serializers.CharField(source='client.email', read_only=True)
+    assigned_worker_name = serializers.CharField(source='assigned_worker.full_name', read_only=True)
+    review_id = serializers.IntegerField(source='worker_review.id', read_only=True, allow_null=True)
 
     class Meta:
         model = JobOrder
@@ -24,6 +26,8 @@ class JobOrderSerializer(serializers.ModelSerializer):
             'client_name',
             'client_email',
             'assigned_worker',
+            'assigned_worker_name',
+            'review_id',
             'created_at',
             'updated_at',
         )
@@ -33,6 +37,8 @@ class JobOrderSerializer(serializers.ModelSerializer):
             'client_name',
             'client_email',
             'assigned_worker',
+            'assigned_worker_name',
+            'review_id',
             'created_at',
             'updated_at',
         )
@@ -47,6 +53,7 @@ class JobOrderSerializer(serializers.ModelSerializer):
         price_type = attrs.get('price_type', getattr(instance, 'price_type', PRICE_TYPE_CHOICES.negotiable))
         price_amount = attrs.get('price_amount', getattr(instance, 'price_amount', None))
         status = attrs.get('status', getattr(instance, 'status', ORDER_STATUS_CHOICES.open))
+        assigned_worker = getattr(instance, 'assigned_worker', None)
 
         if price_type == PRICE_TYPE_CHOICES.fixed and price_amount is None:
             raise serializers.ValidationError(
@@ -58,6 +65,11 @@ class JobOrderSerializer(serializers.ModelSerializer):
 
         if status not in ORDER_STATUS_CHOICES.values:
             raise serializers.ValidationError({'status': "Noto'g'ri status yuborildi."})
+
+        if status == ORDER_STATUS_CHOICES.completed and not assigned_worker:
+            raise serializers.ValidationError(
+                {'status': "Usta biriktirilmagan e`lonni yakunlash mumkin emas."}
+            )
 
         return attrs
 

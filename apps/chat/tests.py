@@ -149,3 +149,47 @@ class ChatApiTests(APITestCase):
         self.assertIsNotNone(last_message)
         self.assertTrue(last_message.is_system)
         self.assertIn('rad etdi', last_message.body)
+
+    def test_mark_read_endpoint_sets_read_and_delivered_for_participant(self):
+        response = self._create_proposal_via_api()
+        thread_id = response.data['chat_thread_id']
+
+        first_message = ChatMessage.objects.filter(thread_id=thread_id).first()
+        self.assertIsNotNone(first_message)
+        self.assertIsNone(first_message.read_by_client_at)
+
+        self.client.force_authenticate(user=self.client_user)
+        mark_read_response = self.client.post(
+            reverse('chat_mark_read', kwargs={'thread_id': thread_id}),
+            {},
+            format='json',
+        )
+        self.assertEqual(mark_read_response.status_code, status.HTTP_200_OK)
+
+        first_message.refresh_from_db()
+        self.assertIsNotNone(first_message.delivered_to_client_at)
+        self.assertIsNotNone(first_message.read_by_client_at)
+
+    def test_message_list_returns_latest_messages_on_first_page(self):
+        response = self._create_proposal_via_api()
+        thread_id = response.data['chat_thread_id']
+        thread = ChatThread.objects.get(pk=thread_id)
+
+        # Pagination yoqilgan holatda birinchi sahifada eng yangi xabarlar chiqishi kerak.
+        for index in range(60):
+            ChatMessage.objects.create(
+                thread=thread,
+                sender=self.worker_user if index % 2 == 0 else self.client_user,
+                body=f'message-{index}',
+            )
+
+        newest = ChatMessage.objects.filter(thread=thread).order_by('-id').first()
+        self.assertIsNotNone(newest)
+
+        self.client.force_authenticate(user=self.client_user)
+        list_response = self.client.get(reverse('chat_message_list_create', kwargs={'thread_id': thread_id}))
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+
+        results = list_response.data.get('results', [])
+        self.assertGreater(len(results), 0)
+        self.assertEqual(results[0]['id'], newest.id)

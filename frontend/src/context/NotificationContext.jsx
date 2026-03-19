@@ -23,7 +23,7 @@ export function NotificationProvider({ children }) {
   const activeThreadIdRef = useRef(null);
   const initializedRef = useRef(false);
 
-  const addToast = useCallback(({ title, message, avatar, onClick, type = 'info', duration = 4500 }) => {
+  const addToast = useCallback(({ title, message, avatar, onClick, type = 'info', duration = 3000 }) => {
     const id = ++toastIdCounter;
     const toast = { id, title, message, avatar, onClick, type, duration };
 

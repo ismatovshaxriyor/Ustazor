@@ -12,13 +12,17 @@ function formatMessageTime(dateStr) {
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return '';
   const now = new Date();
-  const diffMs = now - d;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'Hozir';
-  if (diffMin < 60) return `${diffMin} daqiqa oldin`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} soat oldin`;
-  return d.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'short' });
+  const isSameDay = (
+    d.getFullYear() === now.getFullYear()
+    && d.getMonth() === now.getMonth()
+    && d.getDate() === now.getDate()
+  );
+  if (isSameDay) {
+    return d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+  }
+  const day = d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit' });
+  const time = d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
+  return `${day} ${time}`;
 }
 
 function formatLastSeen(dateStr) {
@@ -66,6 +70,25 @@ function buildWsUrl(threadId, token) {
   return `${wsBase}/ws/chat/threads/${threadId}/?token=${encodeURIComponent(token)}`;
 }
 
+function getOtherUserId(thread, currentUserId) {
+  if (!thread) return null;
+  if (thread.client_id === currentUserId) return thread.worker_id;
+  return thread.client_id;
+}
+
+function getOwnMessageState(message, activeThread, currentUserId) {
+  if (!message || !activeThread || !currentUserId) return null;
+  if (message.is_system || message.sender_id !== currentUserId) return null;
+
+  const senderIsClient = activeThread.client_id === currentUserId;
+  const deliveredAt = senderIsClient ? message.delivered_to_worker_at : message.delivered_to_client_at;
+  const readAt = senderIsClient ? message.read_by_worker_at : message.read_by_client_at;
+
+  if (readAt) return 'read';
+  if (deliveredAt) return 'delivered';
+  return 'sent';
+}
+
 function ChatPage() {
   const navigate = useNavigate();
   const { threadId } = useParams();
@@ -78,8 +101,12 @@ function ChatPage() {
   const socketRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const prevMessageCountRef = useRef(0);
+  const seenMessageIdsRef = useRef(new Set());
+  const activeThreadRef = useRef(null);
+  const lastReadSyncAtRef = useRef(0);
   const [socketConnected, setSocketConnected] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [pendingIncomingCount, setPendingIncomingCount] = useState(0);
   const [wsRetryTick, setWsRetryTick] = useState(0);
   const [status, setStatus] = useState({
     threadsLoading: true,
@@ -90,6 +117,42 @@ function ChatPage() {
     error: '',
     success: '',
   });
+
+  const isThreadNearBottom = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return false;
+    }
+    const distance = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return distance < 140;
+  }, []);
+
+  const shouldMarkRead = useCallback((force = false) => {
+    if (force) {
+      return true;
+    }
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+      return false;
+    }
+    return isThreadNearBottom();
+  }, [isThreadNearBottom]);
+
+  const markThreadReadServer = useCallback((targetThreadId, options = {}) => {
+    if (!isAuthenticated || !tokens.access || !targetThreadId) {
+      return;
+    }
+    const force = Boolean(options.force);
+    if (!shouldMarkRead(force)) {
+      return;
+    }
+    const now = Date.now();
+    if (!force && now - lastReadSyncAtRef.current < 900) {
+      return;
+    }
+    lastReadSyncAtRef.current = now;
+    markThreadRead(targetThreadId);
+    authApi.markChatRead(targetThreadId, tokens.access).catch(() => {});
+  }, [isAuthenticated, tokens.access, markThreadRead, shouldMarkRead]);
 
   useEffect(() => {
     if (!isAuthenticated || !tokens.access) {
@@ -160,7 +223,8 @@ function ChatPage() {
         if (!active) {
           return;
         }
-        setMessages(normalizeList(data));
+        setMessages(mergeMessageLists([], normalizeList(data)));
+        markThreadReadServer(activeThreadId, { force: true });
         setStatus((prev) => ({ ...prev, messagesLoading: false }));
       })
       .catch((error) => {
@@ -178,7 +242,7 @@ function ChatPage() {
     return () => {
       active = false;
     };
-  }, [isAuthenticated, tokens.access, activeThreadId]);
+  }, [isAuthenticated, tokens.access, activeThreadId, markThreadReadServer]);
 
   const scrollToBottom = useCallback((behavior = 'smooth') => {
     const container = messagesContainerRef.current;
@@ -198,8 +262,22 @@ function ChatPage() {
   }, []);
 
   useEffect(() => {
+    seenMessageIdsRef.current = new Set();
+    prevMessageCountRef.current = 0;
+    setPendingIncomingCount(0);
+  }, [activeThreadId]);
+
+  useEffect(() => {
     const newCount = messages.length;
     const oldCount = prevMessageCountRef.current;
+    const seenIds = seenMessageIdsRef.current;
+    const newlyAdded = [];
+    messages.forEach((item) => {
+      if (!seenIds.has(item.id)) {
+        seenIds.add(item.id);
+        newlyAdded.push(item);
+      }
+    });
     prevMessageCountRef.current = newCount;
 
     if (newCount > oldCount) {
@@ -211,11 +289,20 @@ function ChatPage() {
       const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 140;
       if (isNearBottom || oldCount === 0) {
         scrollToBottom(oldCount === 0 ? 'instant' : 'smooth');
+        if (isNearBottom) {
+          setPendingIncomingCount(0);
+        }
       } else {
         setShowScrollBtn(true);
+        const incomingFromOtherUser = newlyAdded.filter(
+          (item) => item.sender_id && item.sender_id !== user?.id,
+        ).length;
+        if (incomingFromOtherUser > 0) {
+          setPendingIncomingCount((prev) => prev + incomingFromOtherUser);
+        }
       }
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, scrollToBottom, user?.id]);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -224,11 +311,15 @@ function ChatPage() {
     const onScroll = () => {
       const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
       setShowScrollBtn(distFromBottom > 140);
+      if (distFromBottom < 140) {
+        setPendingIncomingCount(0);
+        markThreadReadServer(activeThreadId);
+      }
     };
 
     container.addEventListener('scroll', onScroll, { passive: true });
     return () => container.removeEventListener('scroll', onScroll);
-  }, [activeThreadId]);
+  }, [activeThreadId, markThreadReadServer]);
 
   useEffect(() => {
     if (!isAuthenticated || !tokens.access || !activeThreadId) {
@@ -267,6 +358,9 @@ function ChatPage() {
               }
               : thread
           )));
+          if (incoming.sender_id !== user?.id) {
+            markThreadReadServer(activeThreadId);
+          }
           return;
         }
 
@@ -279,6 +373,75 @@ function ChatPage() {
                 : thread
             )));
           }
+          return;
+        }
+
+        if (payload.type === 'delivery_receipt' && payload.data) {
+          const { message_id: messageId, by_user_id: byUserId, at } = payload.data;
+          if (!messageId || !byUserId) {
+            return;
+          }
+          const currentThread = activeThreadRef.current;
+          setMessages((prev) => prev.map((item) => {
+            if (item.id !== messageId) {
+              return item;
+            }
+            if (byUserId === currentThread?.client_id) {
+              return { ...item, delivered_to_client_at: at || item.delivered_to_client_at };
+            }
+            if (byUserId === currentThread?.worker_id) {
+              return { ...item, delivered_to_worker_at: at || item.delivered_to_worker_at };
+            }
+            return item;
+          }));
+          return;
+        }
+
+        if (payload.type === 'read_receipt' && payload.data) {
+          const { message_id: messageId, by_user_id: byUserId, at } = payload.data;
+          if (!messageId || !byUserId) {
+            return;
+          }
+          const currentThread = activeThreadRef.current;
+          setMessages((prev) => prev.map((item) => {
+            if (item.id > messageId) {
+              return item;
+            }
+            if (byUserId === currentThread?.client_id) {
+              return {
+                ...item,
+                delivered_to_client_at: at || item.delivered_to_client_at,
+                read_by_client_at: at || item.read_by_client_at,
+              };
+            }
+            if (byUserId === currentThread?.worker_id) {
+              return {
+                ...item,
+                delivered_to_worker_at: at || item.delivered_to_worker_at,
+                read_by_worker_at: at || item.read_by_worker_at,
+              };
+            }
+            return item;
+          }));
+          return;
+        }
+
+        if (payload.type === 'presence_update' && payload.data) {
+          const { user_id: updatedUserId, is_online: isOnline, last_seen_at: lastSeenAt } = payload.data;
+          if (!updatedUserId) {
+            return;
+          }
+          setThreads((prev) => prev.map((thread) => {
+            const otherId = getOtherUserId(thread, user?.id);
+            if (otherId !== updatedUserId) {
+              return thread;
+            }
+            return {
+              ...thread,
+              other_user_online: Boolean(isOnline),
+              other_user_last_seen_at: lastSeenAt || thread.other_user_last_seen_at,
+            };
+          }));
         }
       } catch {
         // JSON parse xatolarini jim o'tkazamiz.
@@ -314,7 +477,7 @@ function ChatPage() {
       }
       setSocketConnected(false);
     };
-  }, [isAuthenticated, tokens.access, activeThreadId, wsRetryTick]);
+  }, [isAuthenticated, tokens.access, activeThreadId, wsRetryTick, user?.id, markThreadReadServer]);
 
   useEffect(() => {
     if (!isAuthenticated || !tokens.access || !activeThreadId || socketConnected) {
@@ -333,6 +496,7 @@ function ChatPage() {
         }
         setMessages((prev) => mergeMessageLists(prev, normalizeList(messagesData)));
         setThreads(normalizeList(threadsData));
+        markThreadReadServer(activeThreadId);
       } catch {
         // Fallback rejimda xatolarni jim o'tkazamiz.
       }
@@ -345,18 +509,23 @@ function ChatPage() {
       active = false;
       window.clearInterval(intervalId);
     };
-  }, [isAuthenticated, tokens.access, activeThreadId, socketConnected]);
+  }, [isAuthenticated, tokens.access, activeThreadId, socketConnected, markThreadReadServer]);
 
   const activeThread = useMemo(
     () => threads.find((item) => item.id === activeThreadId) || null,
     [threads, activeThreadId],
   );
 
+  useEffect(() => {
+    activeThreadRef.current = activeThread;
+  }, [activeThread]);
+
   const openThread = (id) => {
     setActiveThreadId(id);
     setActiveThread(id);
     navigate(`/chat/${id}`);
-    markThreadRead(id);
+    setPendingIncomingCount(0);
+    markThreadReadServer(id, { force: true });
     setStatus((prev) => ({ ...prev, error: '', success: '' }));
   };
 
@@ -445,15 +614,8 @@ function ChatPage() {
     return <Navigate to="/auth/login" replace />;
   }
 
-  const otherOnline = useMemo(() => {
-    if (!activeThread) return false;
-    const lastMsg = activeThread.last_message_at;
-    if (!lastMsg) return false;
-    const diff = Date.now() - new Date(lastMsg).getTime();
-    return diff < 3 * 60 * 1000;
-  }, [activeThread]);
-
-  const otherLastSeen = activeThread?.last_message_at || null;
+  const otherOnline = Boolean(activeThread?.other_user_online);
+  const otherLastSeen = activeThread?.other_user_last_seen_at || null;
 
   return (
     <section className="chat-shell reveal-up">
@@ -467,7 +629,7 @@ function ChatPage() {
           ) : (
             threads.map((thread) => {
               const isActive = thread.id === activeThreadId;
-              const threadOnline = thread.last_message_at && (Date.now() - new Date(thread.last_message_at).getTime() < 3 * 60 * 1000);
+              const threadOnline = Boolean(thread.other_user_online);
               return (
                 <button
                   key={thread.id}
@@ -569,6 +731,8 @@ function ChatPage() {
                 messages.map((message) => {
                   const isSelf = message.sender_id === user?.id;
                   const isSystem = message.is_system;
+                  const ownState = getOwnMessageState(message, activeThread, user?.id);
+                  const ownStateTick = ownState === 'sent' ? '✔' : '✔✔';
 
                   return (
                     <div
@@ -578,7 +742,14 @@ function ChatPage() {
                       {!isSystem && <p className="message-author">{message.sender_name}</p>}
                       <p className="message-body">{message.body}</p>
                       {message.created_at && (
-                        <span className="message-time">{formatMessageTime(message.created_at)}</span>
+                        <span className="message-meta">
+                          <span className="message-time">{formatMessageTime(message.created_at)}</span>
+                          {ownState ? (
+                            <span className={`message-check message-check-${ownState}`} title={ownState}>
+                              {ownStateTick}
+                            </span>
+                          ) : null}
+                        </span>
                       )}
                     </div>
                   );
@@ -590,10 +761,18 @@ function ChatPage() {
               <button
                 type="button"
                 className="chat-scroll-btn"
-                onClick={() => scrollToBottom()}
+                onClick={() => {
+                  scrollToBottom('instant');
+                  setShowScrollBtn(false);
+                  setPendingIncomingCount(0);
+                  markThreadReadServer(activeThreadId, { force: true });
+                }}
                 aria-label="Pastga tushish"
               >
                 <ChevronDown size={20} />
+                {pendingIncomingCount > 0 ? (
+                  <span className="chat-scroll-count">{pendingIncomingCount > 99 ? '99+' : pendingIncomingCount}</span>
+                ) : null}
               </button>
             )}
 

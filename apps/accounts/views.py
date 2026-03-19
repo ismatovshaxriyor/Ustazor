@@ -1,5 +1,6 @@
 from drf_spectacular.utils import extend_schema
-from django.db.models import Prefetch, Q
+from django.db.models import Avg, Count, FloatField, Prefetch, Q, Value
+from django.db.models.functions import Coalesce
 from rest_framework import generics, parsers, permissions, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -26,6 +27,7 @@ from apps.accounts.serializers import (
 )
 from apps.accounts.models import USER_TYPE_CHOICES, WorkerProfile, WorkerSkill
 from apps.jobs.models import ORDER_STATUS_CHOICES, JobOrder
+from apps.reviews.models import WorkerPortfolio, WorkerReview
 
 
 def _worker_profile_for_user(user):
@@ -61,10 +63,38 @@ def _public_worker_queryset():
         queryset=WorkerSkill.objects.filter(is_active=True).order_by('-updated_at', '-created_at'),
         to_attr='active_skills',
     )
-    return WorkerProfile.objects.select_related('user').prefetch_related(active_skills_prefetch).filter(
-        user__is_active=True,
-        user__is_verified=True,
-        user__user_type=USER_TYPE_CHOICES.worker,
+    public_reviews_prefetch = Prefetch(
+        'user__received_worker_reviews',
+        queryset=(
+            WorkerReview.objects
+            .select_related('client', 'worker', 'order')
+            .prefetch_related('images')
+            .order_by('-created_at')
+        ),
+        to_attr='public_reviews',
+    )
+    public_portfolio_prefetch = Prefetch(
+        'user__portfolio_items',
+        queryset=WorkerPortfolio.objects.prefetch_related('images').order_by('-is_featured', '-created_at'),
+        to_attr='public_portfolio',
+    )
+    return (
+        WorkerProfile.objects
+        .select_related('user')
+        .prefetch_related(active_skills_prefetch, public_reviews_prefetch, public_portfolio_prefetch)
+        .filter(
+            user__is_active=True,
+            user__is_verified=True,
+            user__user_type=USER_TYPE_CHOICES.worker,
+        )
+        .annotate(
+            rating_avg=Coalesce(
+                Avg('user__received_worker_reviews__rating'),
+                Value(0.0),
+                output_field=FloatField(),
+            ),
+            rating_count=Count('user__received_worker_reviews', distinct=True),
+        )
     )
 
 
@@ -80,6 +110,8 @@ class PublicWorkerListView(generics.ListAPIView):
         category = (self.request.query_params.get('category') or '').strip()
         city = (self.request.query_params.get('city') or '').strip()
         available = (self.request.query_params.get('available') or '').strip().lower()
+        min_rating = (self.request.query_params.get('min_rating') or '').strip()
+        sort = (self.request.query_params.get('sort') or 'rating_desc').strip().lower()
 
         if query:
             queryset = queryset.filter(
@@ -104,7 +136,21 @@ class PublicWorkerListView(generics.ListAPIView):
         elif available in {'0', 'false', 'no'}:
             queryset = queryset.filter(is_available=False)
 
-        return queryset.distinct().order_by('-updated_at', '-created_at')
+        if min_rating:
+            try:
+                min_rating_value = float(min_rating)
+            except (TypeError, ValueError):
+                min_rating_value = 0.0
+            queryset = queryset.filter(rating_avg__gte=min_rating_value)
+
+        if sort == 'rating_asc':
+            ordering = ('rating_avg', '-rating_count', '-updated_at', '-created_at')
+        elif sort == 'newest':
+            ordering = ('-updated_at', '-created_at')
+        else:
+            ordering = ('-rating_avg', '-rating_count', '-updated_at', '-created_at')
+
+        return queryset.distinct().order_by(*ordering)
 
 
 @extend_schema(tags=['Public'], summary='Bitta usta profilini olish')

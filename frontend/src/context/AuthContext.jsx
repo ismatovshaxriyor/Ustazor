@@ -137,6 +137,54 @@ export function AuthProvider({ children }) {
     return authApi.listMyProposals(tokens.access);
   }, [tokens.access]);
 
+  const closeOrder = useCallback(async (orderId) => {
+    if (!tokens.access) {
+      throw new Error('Avval tizimga kiring.');
+    }
+
+    return authApi.closeOrder(orderId, tokens.access);
+  }, [tokens.access]);
+
+  const createOrderReview = useCallback(async (orderId, payload) => {
+    if (!tokens.access) {
+      throw new Error('Avval tizimga kiring.');
+    }
+
+    return authApi.createOrderReview(orderId, payload, tokens.access);
+  }, [tokens.access]);
+
+  const fetchMyPortfolio = useCallback(async () => {
+    if (!tokens.access) {
+      throw new Error('Avval tizimga kiring.');
+    }
+
+    return authApi.listMyPortfolio(tokens.access);
+  }, [tokens.access]);
+
+  const createPortfolio = useCallback(async (payload) => {
+    if (!tokens.access) {
+      throw new Error('Avval tizimga kiring.');
+    }
+
+    return authApi.createPortfolio(payload, tokens.access);
+  }, [tokens.access]);
+
+  const updatePortfolio = useCallback(async (id, payload) => {
+    if (!tokens.access) {
+      throw new Error('Avval tizimga kiring.');
+    }
+
+    return authApi.updatePortfolio(id, payload, tokens.access);
+  }, [tokens.access]);
+
+  const deletePortfolio = useCallback(async (id) => {
+    if (!tokens.access) {
+      throw new Error('Avval tizimga kiring.');
+    }
+
+    return authApi.deletePortfolio(id, tokens.access);
+  }, [tokens.access]);
+
   const logout = useCallback(() => {
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(REFRESH_KEY);
@@ -188,6 +236,12 @@ export function AuthProvider({ children }) {
       fetchWorkerDashboard,
       applyToVacancy,
       fetchMyProposals,
+      closeOrder,
+      createOrderReview,
+      fetchMyPortfolio,
+      createPortfolio,
+      updatePortfolio,
+      deletePortfolio,
       deleteAccount,
       logout,
     }),
@@ -210,6 +264,12 @@ export function AuthProvider({ children }) {
       fetchWorkerDashboard,
       applyToVacancy,
       fetchMyProposals,
+      closeOrder,
+      createOrderReview,
+      fetchMyPortfolio,
+      createPortfolio,
+      updatePortfolio,
+      deletePortfolio,
       deleteAccount,
       logout,
     ],

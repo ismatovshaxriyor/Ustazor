@@ -137,6 +137,33 @@ class JobOrderApiTests(APITestCase):
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['status'], ORDER_STATUS_CHOICES.completed)
 
+    def test_client_can_close_in_progress_order_with_assigned_worker(self):
+        order = JobOrder.objects.create(
+            client=self.client_user,
+            assigned_worker=self.worker_user,
+            title='Jarayondagi ish',
+            description='Test',
+            status=ORDER_STATUS_CHOICES.in_progress,
+            price_type=PRICE_TYPE_CHOICES.negotiable,
+        )
+
+        response = self.client.post(reverse('order_close', kwargs={'pk': order.id}), {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['status'], ORDER_STATUS_CHOICES.completed)
+        self.assertEqual(response.data['assigned_worker_name'], self.worker_user.full_name)
+
+    def test_client_cannot_close_order_without_assigned_worker(self):
+        order = JobOrder.objects.create(
+            client=self.client_user,
+            title='Ustasiz ish',
+            description='Test',
+            status=ORDER_STATUS_CHOICES.open,
+            price_type=PRICE_TYPE_CHOICES.negotiable,
+        )
+
+        response = self.client.post(reverse('order_close', kwargs={'pk': order.id}), {}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_cannot_access_other_user_order(self):
         other_order = JobOrder.objects.create(
             client=self.other_client_user,
@@ -199,3 +226,18 @@ class JobOrderApiTests(APITestCase):
 
         self.assertEqual(open_response.status_code, status.HTTP_200_OK)
         self.assertEqual(closed_response.status_code, status.HTTP_404_NOT_FOUND)
+
+        self.client.force_authenticate(user=self.client_user)
+        owner_response = self.client.get(reverse('public_vacancy_detail', kwargs={'pk': closed_order.id}))
+        self.assertEqual(owner_response.status_code, status.HTTP_200_OK)
+
+        closed_order.assigned_worker = self.worker_user
+        closed_order.save(update_fields=['assigned_worker', 'updated_at'])
+
+        self.client.force_authenticate(user=self.worker_user)
+        worker_response = self.client.get(reverse('public_vacancy_detail', kwargs={'pk': closed_order.id}))
+        self.assertEqual(worker_response.status_code, status.HTTP_200_OK)
+
+        self.client.force_authenticate(user=self.other_client_user)
+        stranger_response = self.client.get(reverse('public_vacancy_detail', kwargs={'pk': closed_order.id}))
+        self.assertEqual(stranger_response.status_code, status.HTTP_404_NOT_FOUND)

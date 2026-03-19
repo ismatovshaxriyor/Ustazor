@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { resolveMediaUrl } from '../utils/media';
-import { formatMoney, formatSkillPrice as formatKonikmaPrice } from '../utils/format';
+import { formatDate, formatSkillPrice as formatKonikmaPrice } from '../utils/format';
 
 const konikmaInitialForm = {
   title: '',
@@ -12,6 +12,15 @@ const konikmaInitialForm = {
   experienceYears: 0,
   extraInfo: '',
   isActive: true,
+};
+
+const portfolioInitialForm = {
+  title: '',
+  description: '',
+  location: '',
+  completedAt: '',
+  isFeatured: false,
+  images: [],
 };
 
 function WorkerProfilePage() {
@@ -24,6 +33,9 @@ function WorkerProfilePage() {
     createWorkerSkill,
     updateWorkerSkill,
     deleteWorkerSkill,
+    fetchMyPortfolio,
+    createPortfolio,
+    deletePortfolio,
   } = useAuth();
   const [account, setAccount] = useState(null);
   const [workerProfile, setWorkerProfile] = useState(null);
@@ -32,6 +44,10 @@ function WorkerProfilePage() {
   const [isKonikmaModalOpen, setIsKonikmaModalOpen] = useState(false);
   const [konikmaForm, setKonikmaForm] = useState(konikmaInitialForm);
   const [konikmaStatus, setKonikmaStatus] = useState({ saving: false, error: '', success: '' });
+  const [portfolioItems, setPortfolioItems] = useState([]);
+  const [isPortfolioModalOpen, setIsPortfolioModalOpen] = useState(false);
+  const [portfolioForm, setPortfolioForm] = useState(portfolioInitialForm);
+  const [portfolioStatus, setPortfolioStatus] = useState({ saving: false, error: '', success: '' });
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -40,14 +56,15 @@ function WorkerProfilePage() {
 
     let active = true;
 
-    Promise.all([fetchMe(), fetchWorkerProfile(), fetchWorkerSkills()])
-      .then(([me, worker, skillsData]) => {
+    Promise.all([fetchMe(), fetchWorkerProfile(), fetchWorkerSkills(), fetchMyPortfolio()])
+      .then(([me, worker, skillsData, portfolioData]) => {
         if (!active) {
           return;
         }
         setAccount(me);
         setWorkerProfile(worker);
         setKonikmalar(Array.isArray(skillsData) ? skillsData : (skillsData.results || []));
+        setPortfolioItems(Array.isArray(portfolioData) ? portfolioData : (portfolioData.results || []));
         setStatus({ loading: false, error: '' });
       })
       .catch((error) => {
@@ -63,7 +80,7 @@ function WorkerProfilePage() {
     return () => {
       active = false;
     };
-  }, [isAuthenticated, fetchMe, fetchWorkerProfile, fetchWorkerSkills]);
+  }, [isAuthenticated, fetchMe, fetchWorkerProfile, fetchWorkerSkills, fetchMyPortfolio]);
 
   const updateKonikmaField = (field) => (event) => {
     const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
@@ -152,6 +169,76 @@ function WorkerProfilePage() {
     }
   };
 
+  const updatePortfolioField = (field) => (event) => {
+    if (field === 'images') {
+      const files = Array.from(event.target.files || []);
+      setPortfolioForm((prev) => ({ ...prev, images: files }));
+      return;
+    }
+    const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
+    setPortfolioForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const openPortfolioModal = () => {
+    setPortfolioForm(portfolioInitialForm);
+    setPortfolioStatus({ saving: false, error: '', success: '' });
+    setIsPortfolioModalOpen(true);
+  };
+
+  const closePortfolioModal = () => {
+    setIsPortfolioModalOpen(false);
+  };
+
+  const onCreatePortfolio = async (event) => {
+    event.preventDefault();
+    setPortfolioStatus({ saving: true, error: '', success: '' });
+
+    try {
+      const formData = new FormData();
+      formData.append('title', portfolioForm.title);
+      formData.append('description', portfolioForm.description);
+      formData.append('location', portfolioForm.location);
+      formData.append('is_featured', String(Boolean(portfolioForm.isFeatured)));
+      if (portfolioForm.completedAt) {
+        formData.append('completed_at', portfolioForm.completedAt);
+      }
+      portfolioForm.images.forEach((image) => {
+        formData.append('images', image);
+      });
+
+      const created = await createPortfolio(formData);
+      setPortfolioItems((prev) => [created, ...prev]);
+      setPortfolioStatus({ saving: false, error: '', success: "Ish namunasi qo`shildi." });
+      setPortfolioForm(portfolioInitialForm);
+      setIsPortfolioModalOpen(false);
+    } catch (error) {
+      setPortfolioStatus({
+        saving: false,
+        error: error.message || 'Ish namunasi qo`shishda xatolik yuz berdi.',
+        success: '',
+      });
+    }
+  };
+
+  const onDeletePortfolio = async (portfolioId) => {
+    const confirmed = window.confirm("Ish namunasi o`chirilsa, qayta tiklanmaydi. Davom etasizmi?");
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deletePortfolio(portfolioId);
+      setPortfolioItems((prev) => prev.filter((item) => item.id !== portfolioId));
+      setPortfolioStatus({ saving: false, error: '', success: "Ish namunasi o`chirildi." });
+    } catch (error) {
+      setPortfolioStatus({
+        saving: false,
+        error: error.message || 'Ish namunasini o`chirishda xatolik yuz berdi.',
+        success: '',
+      });
+    }
+  };
+
   if (!isAuthenticated) {
     return <Navigate to="/auth/login" replace />;
   }
@@ -212,10 +299,6 @@ function WorkerProfilePage() {
             <p className="worker-meta-label">Xizmat hududi</p>
             <p className="worker-meta-value">{workerProfile?.service_city || 'Kiritilmagan'}</p>
           </article>
-          <article className="worker-meta-card">
-            <p className="worker-meta-label">Minimal buyurtma narxi</p>
-            <p className="worker-meta-value">{formatMoney(workerProfile?.min_order_price)}</p>
-          </article>
         </div>
 
         <article className="worker-about-card">
@@ -265,6 +348,62 @@ function WorkerProfilePage() {
                       type="button"
                       className="button button-ghost danger-button"
                       onClick={() => onDeleteKonikma(konikma.id)}
+                    >
+                      O`chirish
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="worker-skills-section">
+          <div className="section-row-head">
+            <h3>Ish namunalarim</h3>
+            <button type="button" className="button button-ghost" onClick={openPortfolioModal}>
+              Ish qo`shish
+            </button>
+          </div>
+          {!isPortfolioModalOpen && portfolioStatus.error && (
+            <p className="form-message error">{portfolioStatus.error}</p>
+          )}
+          {!isPortfolioModalOpen && portfolioStatus.success && (
+            <p className="form-message success">{portfolioStatus.success}</p>
+          )}
+
+          {portfolioItems.length === 0 ? (
+            <p className="muted">Hozircha ish namunalari yo`q.</p>
+          ) : (
+            <div className="worker-skill-grid">
+              {portfolioItems.map((item) => (
+                <article key={item.id} className="worker-skill-card">
+                  <div className="worker-skill-head">
+                    <h4>{item.title}</h4>
+                    {item.completed_at ? (
+                      <span className="status-pill status-open">{formatDate(item.completed_at)}</span>
+                    ) : null}
+                  </div>
+                  <p>{item.description || 'Tavsif kiritilmagan.'}</p>
+                  {item.location ? <p className="muted">Hudud: {item.location}</p> : null}
+                  {Array.isArray(item.images) && item.images.length > 0 ? (
+                    <div className="portfolio-image-row">
+                      {item.images.map((image) => (
+                        <img
+                          key={image.id}
+                          src={resolveMediaUrl(image.image_url)}
+                          alt={item.title}
+                          className="portfolio-image-thumb"
+                          loading="lazy"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="skill-card-actions">
+                    <button
+                      type="button"
+                      className="button button-ghost danger-button"
+                      onClick={() => onDeletePortfolio(item.id)}
                     >
                       O`chirish
                     </button>
@@ -393,6 +532,110 @@ function WorkerProfilePage() {
                 </button>
                 <button className="button button-primary" type="submit" disabled={konikmaStatus.saving}>
                   {konikmaStatus.saving ? 'Saqlanmoqda...' : 'Xizmat qo`shish'}
+                </button>
+              </div>
+            </form>
+          </article>
+        </div>
+      )}
+
+      {isPortfolioModalOpen && (
+        <div className="modal-backdrop" onClick={closePortfolioModal} role="presentation">
+          <article className="modal-card card" onClick={(event) => event.stopPropagation()}>
+            <div className="section-row-head">
+              <h3>Yangi ish namunasi</h3>
+              <button type="button" className="button button-ghost" onClick={closePortfolioModal}>
+                Yopish
+              </button>
+            </div>
+            {isPortfolioModalOpen && portfolioStatus.error && (
+              <p className="form-message error">{portfolioStatus.error}</p>
+            )}
+
+            <form className="stack-small" onSubmit={onCreatePortfolio}>
+              <div>
+                <label className="label" htmlFor="portfolio-title">
+                  Ish nomi
+                </label>
+                <input
+                  id="portfolio-title"
+                  className="input"
+                  value={portfolioForm.title}
+                  onChange={updatePortfolioField('title')}
+                  placeholder="Masalan: Ofis to`liq ta`miri"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="label" htmlFor="portfolio-description">
+                  Tavsif
+                </label>
+                <textarea
+                  id="portfolio-description"
+                  className="input"
+                  rows={3}
+                  value={portfolioForm.description}
+                  onChange={updatePortfolioField('description')}
+                />
+              </div>
+
+              <div className="profile-grid">
+                <div>
+                  <label className="label" htmlFor="portfolio-location">
+                    Hudud
+                  </label>
+                  <input
+                    id="portfolio-location"
+                    className="input"
+                    value={portfolioForm.location}
+                    onChange={updatePortfolioField('location')}
+                    placeholder="Masalan: Toshkent"
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="portfolio-completed-at">
+                    Tugagan sana
+                  </label>
+                  <input
+                    id="portfolio-completed-at"
+                    className="input"
+                    type="date"
+                    value={portfolioForm.completedAt}
+                    onChange={updatePortfolioField('completedAt')}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="label" htmlFor="portfolio-images">
+                  Rasmlar
+                </label>
+                <input
+                  id="portfolio-images"
+                  className="input"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={updatePortfolioField('images')}
+                />
+              </div>
+
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={portfolioForm.isFeatured}
+                  onChange={updatePortfolioField('isFeatured')}
+                />
+                Muhim ish sifatida ko`rsatilsin
+              </label>
+
+              <div className="modal-actions">
+                <button type="button" className="button button-ghost" onClick={closePortfolioModal}>
+                  Bekor qilish
+                </button>
+                <button className="button button-primary" type="submit" disabled={portfolioStatus.saving}>
+                  {portfolioStatus.saving ? 'Saqlanmoqda...' : 'Ishni qo`shish'}
                 </button>
               </div>
             </form>

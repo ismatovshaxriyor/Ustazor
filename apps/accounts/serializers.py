@@ -11,6 +11,8 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from apps.accounts.models import USER_TYPE_CHOICES, WorkerProfile, WorkerSkill
+from apps.reviews.models import WorkerPortfolio, WorkerReview
+from apps.reviews.serializers import WorkerPortfolioPublicSerializer, WorkerReviewPublicSerializer
 from apps.accounts.services.activation import (
     clear_activation_payload,
     generate_activation_code,
@@ -255,6 +257,8 @@ class WorkerPublicListSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source='user.full_name', read_only=True)
     profile_photo_url = serializers.SerializerMethodField()
     skills = serializers.SerializerMethodField()
+    rating_avg = serializers.FloatField(read_only=True)
+    rating_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = WorkerProfile
@@ -269,6 +273,8 @@ class WorkerPublicListSerializer(serializers.ModelSerializer):
             'min_order_price',
             'is_available',
             'skills',
+            'rating_avg',
+            'rating_count',
         )
 
     def get_profile_photo_url(self, obj) -> str:
@@ -288,6 +294,10 @@ class WorkerPublicDetailSerializer(serializers.ModelSerializer):
     phone_number = serializers.CharField(source='user.phone_number', read_only=True)
     profile_photo_url = serializers.SerializerMethodField()
     skills = serializers.SerializerMethodField()
+    rating_avg = serializers.FloatField(read_only=True)
+    rating_count = serializers.IntegerField(read_only=True)
+    reviews = serializers.SerializerMethodField()
+    portfolio = serializers.SerializerMethodField()
 
     class Meta:
         model = WorkerProfile
@@ -304,6 +314,10 @@ class WorkerPublicDetailSerializer(serializers.ModelSerializer):
             'min_order_price',
             'is_available',
             'skills',
+            'rating_avg',
+            'rating_count',
+            'reviews',
+            'portfolio',
         )
 
     def get_profile_photo_url(self, obj) -> str:
@@ -315,6 +329,31 @@ class WorkerPublicDetailSerializer(serializers.ModelSerializer):
         if active_skills is None:
             active_skills = obj.skills.filter(is_active=True)
         return WorkerPublicSkillSerializer(active_skills, many=True).data
+
+    @extend_schema_field(WorkerReviewPublicSerializer(many=True))
+    def get_reviews(self, obj) -> list[dict]:
+        reviews = getattr(obj.user, 'public_reviews', None)
+        if reviews is None:
+            reviews = (
+                WorkerReview.objects
+                .select_related('client', 'worker', 'order')
+                .prefetch_related('images')
+                .filter(worker=obj.user)
+                .order_by('-created_at')
+            )
+        return WorkerReviewPublicSerializer(reviews[:10], many=True, context=self.context).data
+
+    @extend_schema_field(WorkerPortfolioPublicSerializer(many=True))
+    def get_portfolio(self, obj) -> list[dict]:
+        portfolio_items = getattr(obj.user, 'public_portfolio', None)
+        if portfolio_items is None:
+            portfolio_items = (
+                WorkerPortfolio.objects
+                .prefetch_related('images')
+                .filter(worker=obj.user)
+                .order_by('-is_featured', '-created_at')
+            )
+        return WorkerPortfolioPublicSerializer(portfolio_items[:12], many=True, context=self.context).data
 
 
 class WorkerDashboardSerializer(serializers.Serializer):

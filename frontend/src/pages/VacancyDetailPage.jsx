@@ -7,7 +7,7 @@ import { formatBudget, formatDate } from '../utils/format';
 function VacancyDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { isAuthenticated, user, applyToVacancy, fetchMyProposals } = useAuth();
+  const { isAuthenticated, user, tokens, applyToVacancy, fetchMyProposals } = useAuth();
   const [vacancy, setVacancy] = useState(null);
   const [status, setStatus] = useState({ loading: true, error: '' });
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
@@ -28,7 +28,7 @@ function VacancyDetailPage() {
     setExistingProposal(null);
     setApplyStatus({ saving: false, error: '', success: '' });
 
-    const vacancyPromise = authApi.getPublicVacancy(id);
+    const vacancyPromise = authApi.getPublicVacancy(id, tokens?.access || null);
     const myProposalsPromise = isWorker
       ? fetchMyProposals().catch(() => [])
       : Promise.resolve([]);
@@ -65,7 +65,7 @@ function VacancyDetailPage() {
     return () => {
       active = false;
     };
-  }, [id, isWorker, fetchMyProposals]);
+  }, [id, isWorker, tokens?.access, fetchMyProposals]);
 
   const onApplyFieldChange = (field) => (event) => {
     setApplyForm((prev) => ({ ...prev, [field]: event.target.value }));

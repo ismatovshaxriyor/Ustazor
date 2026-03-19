@@ -30,6 +30,10 @@ SPECTACULAR_SETTINGS = {
             'name': 'Chat',
             'description': 'Mijoz va usta o`rtasidagi suhbatlar va chat orqali qabul qilish jarayoni.',
         },
+        {
+            'name': 'Reviews',
+            'description': 'Mijozning baholashlari, baho rasmlari va usta portfolio endpointlari.',
+        },
     ],
     "SERVE_INCLUDE_SCHEMA": False,
 }

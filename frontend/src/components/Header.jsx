@@ -68,35 +68,50 @@ function Header() {
             <>
               <NavLink
                 to="/profile"
-                className="header-icon-action"
+                className="header-icon-action header-icon-labeled"
                 aria-label="Profil"
                 title="Profil"
                 onClick={closeMobileMenu}
               >
-                {user?.profile_photo_url || user?.profile_photo ? (
-                  <img
-                    src={resolveMediaUrl(user.profile_photo_url || user.profile_photo, { userType: user?.user_type })}
-                    alt="Profil rasmi"
-                    className="header-icon-avatar"
-                  />
-                ) : (
-                  <UserRound size={18} />
-                )}
+                <span className="header-icon-glyph">
+                  {user?.profile_photo_url || user?.profile_photo ? (
+                    <img
+                      src={resolveMediaUrl(user.profile_photo_url || user.profile_photo, { userType: user?.user_type })}
+                      alt="Profil rasmi"
+                      className="header-icon-avatar"
+                    />
+                  ) : (
+                    <UserRound size={18} />
+                  )}
+                </span>
+                <span className="header-icon-label" aria-hidden="true">Profil</span>
               </NavLink>
-              <NavLink to="/chat" className="header-icon-action header-chat-icon" aria-label="Chat" title="Chat" onClick={closeMobileMenu}>
-                <MessageCircle size={18} />
+              <NavLink
+                to="/chat"
+                className="header-icon-action header-icon-labeled header-chat-icon"
+                aria-label="Chat"
+                title="Chat"
+                onClick={closeMobileMenu}
+              >
+                <span className="header-icon-glyph">
+                  <MessageCircle size={18} />
+                </span>
+                <span className="header-icon-label" aria-hidden="true">Chat</span>
                 {unreadCount > 0 && (
                   <span className="header-unread-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
                 )}
               </NavLink>
               <button
-                className="header-icon-action"
+                className="header-icon-action header-icon-labeled"
                 onClick={() => { logout(); closeMobileMenu(); }}
                 type="button"
                 aria-label="Chiqish"
                 title="Chiqish"
               >
-                <LogOut size={18} />
+                <span className="header-icon-glyph">
+                  <LogOut size={18} />
+                </span>
+                <span className="header-icon-label" aria-hidden="true">Chiqish</span>
               </button>
             </>
           ) : (
@@ -116,4 +131,3 @@ function Header() {
 }
 
 export default Header;
-

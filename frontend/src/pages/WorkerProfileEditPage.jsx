@@ -19,7 +19,6 @@ function WorkerProfileEditPage() {
     experienceYears: 0,
     serviceCity: '',
     about: '',
-    minOrderPrice: '',
     isAvailable: true,
   });
   const [photoFile, setPhotoFile] = useState(null);
@@ -46,7 +45,6 @@ function WorkerProfileEditPage() {
           experienceYears: worker.experience_years ?? 0,
           serviceCity: worker.service_city || '',
           about: worker.about || '',
-          minOrderPrice: worker.min_order_price || '',
           isAvailable: Boolean(worker.is_available),
         });
         setPhotoPreview(resolveMediaUrl(me.profile_photo_url, { userType: 'worker' }));
@@ -101,7 +99,6 @@ function WorkerProfileEditPage() {
       service_city: form.serviceCity,
       about: form.about,
       is_available: Boolean(form.isAvailable),
-      min_order_price: form.minOrderPrice === '' ? null : form.minOrderPrice,
     };
 
     try {
@@ -232,19 +229,6 @@ function WorkerProfileEditPage() {
                   value={form.serviceCity}
                   onChange={updateField('serviceCity')}
                   placeholder="Masalan: Toshkent"
-                />
-              </div>
-              <div>
-                <label className="label" htmlFor="worker-price">
-                  Minimal narx (so`m)
-                </label>
-                <input
-                  id="worker-price"
-                  className="input"
-                  type="number"
-                  min="0"
-                  value={form.minOrderPrice}
-                  onChange={updateField('minOrderPrice')}
                 />
               </div>
             </div>

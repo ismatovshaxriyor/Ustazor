@@ -26,6 +26,10 @@ const FIELD_LABELS = {
   due_date: 'Muddat',
   cover_letter: 'Murojaat xati',
   proposed_price: 'Taklif narxi',
+  rating: 'Baho',
+  comment: 'Izoh',
+  images: 'Rasmlar',
+  location: 'Hudud',
 };
 
 function toMessage(value) {
@@ -234,6 +238,15 @@ export const authApi = {
       body: JSON.stringify(payload),
     });
   },
+  closeOrder(id, accessToken) {
+    return request(`/api/orders/${id}/close/`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({}),
+    });
+  },
   listPublicWorkers(params = {}) {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -257,8 +270,15 @@ export const authApi = {
     const suffix = query.toString() ? `?${query.toString()}` : '';
     return request(`/api/vacancies/${suffix}`, { method: 'GET' });
   },
-  getPublicVacancy(id) {
-    return request(`/api/vacancies/${id}/`, { method: 'GET' });
+  getPublicVacancy(id, accessToken = null) {
+    const headers = {};
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+    return request(`/api/vacancies/${id}/`, {
+      method: 'GET',
+      headers,
+    });
   },
   applyToVacancy(id, payload, accessToken) {
     return request(`/api/vacancies/${id}/apply/`, {
@@ -326,6 +346,15 @@ export const authApi = {
       body: JSON.stringify(payload),
     });
   },
+  markChatRead(threadId, accessToken) {
+    return request(`/api/chat/threads/${threadId}/read/`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({}),
+    });
+  },
   acceptChatWorker(threadId, accessToken) {
     return request(`/api/chat/threads/${threadId}/accept-worker/`, {
       method: 'POST',
@@ -342,6 +371,62 @@ export const authApi = {
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({}),
+    });
+  },
+  createOrderReview(orderId, payload, accessToken) {
+    const body = payload instanceof FormData ? payload : JSON.stringify(payload);
+    return request(`/api/reviews/orders/${orderId}/`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body,
+    });
+  },
+  listPublicWorkerReviews(workerId) {
+    return request(`/api/reviews/workers/${workerId}/`, {
+      method: 'GET',
+    });
+  },
+  listMyPortfolio(accessToken) {
+    return request('/api/reviews/portfolio/my/', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  },
+  createPortfolio(payload, accessToken) {
+    const body = payload instanceof FormData ? payload : JSON.stringify(payload);
+    return request('/api/reviews/portfolio/my/', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body,
+    });
+  },
+  updatePortfolio(id, payload, accessToken) {
+    const body = payload instanceof FormData ? payload : JSON.stringify(payload);
+    return request(`/api/reviews/portfolio/my/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body,
+    });
+  },
+  deletePortfolio(id, accessToken) {
+    return request(`/api/reviews/portfolio/my/${id}/`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+  },
+  listPublicWorkerPortfolio(workerId) {
+    return request(`/api/reviews/portfolio/workers/${workerId}/`, {
+      method: 'GET',
     });
   },
 };

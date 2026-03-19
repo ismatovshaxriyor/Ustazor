@@ -1,9 +1,13 @@
+from django.utils import timezone
 from django.db import models
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
 from apps.chat.models import CHAT_MESSAGE_VISIBILITY_CHOICES, ChatMessage, ChatThread
-from apps.chat.realtime import thread_group_name
+from apps.chat.presence import mark_user_connected, mark_user_disconnected
+from apps.chat.realtime import (
+    thread_group_name,
+)
 from apps.chat.serializers import ChatMessageSerializer
 
 
@@ -28,10 +32,40 @@ class ChatThreadConsumer(AsyncJsonWebsocketConsumer):
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
 
+        is_online, last_seen_at = await self._mark_connected(user.id)
+        await self.channel_layer.group_send(
+            self.group_name,
+            {
+                'type': 'chat.presence_update',
+                'data': {
+                    'user_id': user.id,
+                    'is_online': is_online,
+                    'last_seen_at': last_seen_at,
+                },
+            },
+        )
+
     async def disconnect(self, close_code):
         group_name = getattr(self, 'group_name', None)
         if group_name:
             await self.channel_layer.group_discard(group_name, self.channel_name)
+
+        user = self.scope.get('user')
+        thread_id = getattr(self, 'thread_id', None)
+        if user and user.is_authenticated and thread_id is not None:
+            is_online, last_seen_at = await self._mark_disconnected(user.id)
+            target_group = group_name or thread_group_name(thread_id)
+            await self.channel_layer.group_send(
+                target_group,
+                {
+                    'type': 'chat.presence_update',
+                    'data': {
+                        'user_id': user.id,
+                        'is_online': is_online,
+                        'last_seen_at': last_seen_at,
+                    },
+                },
+            )
 
     async def receive_json(self, content, **kwargs):
         msg_type = content.get('type')
@@ -59,6 +93,22 @@ class ChatThreadConsumer(AsyncJsonWebsocketConsumer):
         if visibility == CHAT_MESSAGE_VISIBILITY_CHOICES.client_only and self.participant_role != 'client':
             return
 
+        sender_id = message.get('sender_id')
+        if sender_id and sender_id != self.scope['user'].id:
+            changed, at = await self._mark_delivered(message['id'], self.participant_role)
+            if changed:
+                await self.channel_layer.group_send(
+                    self.group_name,
+                    {
+                        'type': 'chat.delivery_receipt',
+                        'data': {
+                            'message_id': message['id'],
+                            'by_user_id': self.scope['user'].id,
+                            'at': at,
+                        },
+                    },
+                )
+
         await self.send_json(
             {
                 'type': 'message',
@@ -70,6 +120,30 @@ class ChatThreadConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json(
             {
                 'type': 'thread_update',
+                'data': event['data'],
+            }
+        )
+
+    async def chat_delivery_receipt(self, event):
+        await self.send_json(
+            {
+                'type': 'delivery_receipt',
+                'data': event['data'],
+            }
+        )
+
+    async def chat_read_receipt(self, event):
+        await self.send_json(
+            {
+                'type': 'read_receipt',
+                'data': event['data'],
+            }
+        )
+
+    async def chat_presence_update(self, event):
+        await self.send_json(
+            {
+                'type': 'presence_update',
                 'data': event['data'],
             }
         )
@@ -101,3 +175,21 @@ class ChatThreadConsumer(AsyncJsonWebsocketConsumer):
         message = ChatMessage.objects.create(thread=thread, sender=sender, body=body)
         thread.save(update_fields=['updated_at'])
         return ChatMessageSerializer(message).data
+
+    @database_sync_to_async
+    def _mark_connected(self, user_id: int) -> tuple[bool, str]:
+        return mark_user_connected(user_id)
+
+    @database_sync_to_async
+    def _mark_disconnected(self, user_id: int) -> tuple[bool, str]:
+        return mark_user_disconnected(user_id)
+
+    @database_sync_to_async
+    def _mark_delivered(self, message_id: int, participant_role: str) -> tuple[bool, str]:
+        now = timezone.now()
+        queryset = ChatMessage.objects.filter(id=message_id)
+        if participant_role == 'client':
+            updated = queryset.filter(delivered_to_client_at__isnull=True).update(delivered_to_client_at=now)
+        else:
+            updated = queryset.filter(delivered_to_worker_at__isnull=True).update(delivered_to_worker_at=now)
+        return bool(updated), now.isoformat()

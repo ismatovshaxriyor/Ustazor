@@ -20,8 +20,21 @@ const vacancyInitialForm = {
   priceAmount: '',
 };
 
+const reviewInitialForm = {
+  rating: '5',
+  comment: '',
+  images: [],
+};
+
 function ClientProfilePage() {
-  const { isAuthenticated, fetchMe, tokens, user } = useAuth();
+  const {
+    isAuthenticated,
+    fetchMe,
+    tokens,
+    user,
+    closeOrder,
+    createOrderReview,
+  } = useAuth();
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState([]);
   const [receivedProposals, setReceivedProposals] = useState([]);
@@ -31,8 +44,12 @@ function ClientProfilePage() {
   const [isVacancyModalOpen, setIsVacancyModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [selectedReviewOrder, setSelectedReviewOrder] = useState(null);
   const [vacancyForm, setVacancyForm] = useState(vacancyInitialForm);
   const [vacancyStatus, setVacancyStatus] = useState({ saving: false, error: '', success: '' });
+  const [reviewForm, setReviewForm] = useState(reviewInitialForm);
+  const [reviewStatus, setReviewStatus] = useState({ saving: false, error: '', success: '' });
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -104,6 +121,18 @@ function ClientProfilePage() {
     setSelectedOrder(null);
   };
 
+  const openReviewModal = (order) => {
+    setSelectedReviewOrder(order);
+    setReviewForm(reviewInitialForm);
+    setReviewStatus({ saving: false, error: '', success: '' });
+    setIsReviewModalOpen(true);
+  };
+
+  const closeReviewModal = () => {
+    setIsReviewModalOpen(false);
+    setSelectedReviewOrder(null);
+  };
+
   const proposalsForSelectedOrder = selectedOrder
     ? receivedProposals.filter((proposal) => proposal.vacancy_id === selectedOrder.id)
     : [];
@@ -158,6 +187,71 @@ function ClientProfilePage() {
       setVacancyStatus({
         saving: false,
         error: error.message || 'Vakansiya yaratishda xatolik yuz berdi.',
+        success: '',
+      });
+    }
+  };
+
+  const onReviewFieldChange = (field) => (event) => {
+    if (field === 'images') {
+      const files = Array.from(event.target.files || []);
+      setReviewForm((prev) => ({ ...prev, images: files }));
+      return;
+    }
+    setReviewForm((prev) => ({ ...prev, [field]: event.target.value }));
+  };
+
+  const onCloseOrder = async (orderId) => {
+    try {
+      const updated = await closeOrder(orderId);
+      setOrders((prev) => prev.map((item) => (item.id === orderId ? updated : item)));
+      setVacancyStatus({
+        saving: false,
+        error: '',
+        success: "E`lon yakunlangan holatga o`tkazildi.",
+      });
+    } catch (error) {
+      setVacancyStatus({
+        saving: false,
+        error: error.message || "E`lonni yopishda xatolik yuz berdi.",
+        success: '',
+      });
+    }
+  };
+
+  const onSubmitReview = async (event) => {
+    event.preventDefault();
+    if (!selectedReviewOrder) {
+      return;
+    }
+
+    setReviewStatus({ saving: true, error: '', success: '' });
+
+    try {
+      const formData = new FormData();
+      formData.append('rating', reviewForm.rating);
+      formData.append('comment', reviewForm.comment);
+      reviewForm.images.forEach((image) => {
+        formData.append('images', image);
+      });
+
+      const created = await createOrderReview(selectedReviewOrder.id, formData);
+      setOrders((prev) => prev.map((item) => (
+        item.id === selectedReviewOrder.id
+          ? { ...item, review_id: created.id }
+          : item
+      )));
+      setReviewStatus({ saving: false, error: '', success: "Baho muvaffaqiyatli saqlandi." });
+      setVacancyStatus({
+        saving: false,
+        error: '',
+        success: "Ustaga baho muvaffaqiyatli qo`shildi.",
+      });
+      setIsReviewModalOpen(false);
+    } catch (error) {
+      setReviewStatus({
+        saving: false,
+        error: error.message || "Bahoni saqlashda xatolik yuz berdi.",
         success: '',
       });
     }
@@ -247,13 +341,34 @@ function ClientProfilePage() {
                   <p className="muted">
                     Murojaatlar: {proposalCountByOrder[order.id] || 0}
                   </p>
-                  <button
-                    type="button"
-                    className="button button-ghost"
-                    onClick={() => openProposalModal(order)}
-                  >
-                    Murojaatlarni ko`rish
-                  </button>
+                  <div className="modal-actions">
+                    <button
+                      type="button"
+                      className="button button-ghost"
+                      onClick={() => openProposalModal(order)}
+                    >
+                      Murojaatlarni ko`rish
+                    </button>
+                    {order.status === 'in_progress' && order.assigned_worker ? (
+                      <button
+                        type="button"
+                        className="button button-ghost"
+                        onClick={() => onCloseOrder(order.id)}
+                      >
+                        E`lonni yopish
+                      </button>
+                    ) : null}
+                    {order.status === 'completed' && order.assigned_worker && !order.review_id ? (
+                      <button
+                        type="button"
+                        className="button button-primary"
+                        onClick={() => openReviewModal(order)}
+                      >
+                        Ustani baholash
+                      </button>
+                    ) : null}
+                    {order.review_id ? <span className="muted">Baholangan</span> : null}
+                  </div>
                 </div>
               </article>
             ))}
@@ -440,6 +555,78 @@ function ClientProfilePage() {
                 </button>
                 <button className="button button-primary" type="submit" disabled={vacancyStatus.saving}>
                   {vacancyStatus.saving ? 'Yaratilmoqda...' : 'Vakansiya yaratish'}
+                </button>
+              </div>
+            </form>
+          </article>
+        </div>
+      )}
+
+      {isReviewModalOpen && (
+        <div className="modal-backdrop" onClick={closeReviewModal} role="presentation">
+          <article className="modal-card card" onClick={(event) => event.stopPropagation()}>
+            <div className="section-row-head">
+              <h3>
+                {selectedReviewOrder?.assigned_worker_name
+                  ? `${selectedReviewOrder.assigned_worker_name} uchun baho`
+                  : 'Ustani baholash'}
+              </h3>
+              <button type="button" className="button button-ghost" onClick={closeReviewModal}>
+                Yopish
+              </button>
+            </div>
+            {reviewStatus.error && <p className="form-message error">{reviewStatus.error}</p>}
+
+            <form className="stack-small" onSubmit={onSubmitReview}>
+              <div>
+                <label className="label" htmlFor="review-rating">
+                  Reyting (1-5)
+                </label>
+                <select
+                  id="review-rating"
+                  className="input"
+                  value={reviewForm.rating}
+                  onChange={onReviewFieldChange('rating')}
+                >
+                  <option value="5">5 - A`lo</option>
+                  <option value="4">4 - Yaxshi</option>
+                  <option value="3">3 - Qoniqarli</option>
+                  <option value="2">2 - Past</option>
+                  <option value="1">1 - Yomon</option>
+                </select>
+              </div>
+              <div>
+                <label className="label" htmlFor="review-comment">
+                  Izoh
+                </label>
+                <textarea
+                  id="review-comment"
+                  className="input"
+                  rows={4}
+                  value={reviewForm.comment}
+                  onChange={onReviewFieldChange('comment')}
+                  placeholder="Ish sifati, vaqt, muloqot haqida yozing."
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="review-images">
+                  Rasmlar (ixtiyoriy)
+                </label>
+                <input
+                  id="review-images"
+                  type="file"
+                  className="input"
+                  multiple
+                  accept="image/*"
+                  onChange={onReviewFieldChange('images')}
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="button button-ghost" onClick={closeReviewModal}>
+                  Bekor qilish
+                </button>
+                <button className="button button-primary" type="submit" disabled={reviewStatus.saving}>
+                  {reviewStatus.saving ? 'Saqlanmoqda...' : 'Bahoni yuborish'}
                 </button>
               </div>
             </form>

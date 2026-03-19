@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from apps.proposals.models import PROPOSAL_STATUS_CHOICES
 from apps.chat.models import ChatMessage, ChatThread
+from apps.chat.presence import get_user_last_seen, get_user_online
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
@@ -18,9 +19,24 @@ class ChatMessageSerializer(serializers.ModelSerializer):
             'body',
             'is_system',
             'visibility',
+            'delivered_to_client_at',
+            'delivered_to_worker_at',
+            'read_by_client_at',
+            'read_by_worker_at',
             'created_at',
         )
-        read_only_fields = ('id', 'sender_id', 'sender_name', 'is_system', 'visibility', 'created_at')
+        read_only_fields = (
+            'id',
+            'sender_id',
+            'sender_name',
+            'is_system',
+            'visibility',
+            'delivered_to_client_at',
+            'delivered_to_worker_at',
+            'read_by_client_at',
+            'read_by_worker_at',
+            'created_at',
+        )
 
     def validate_body(self, value):
         clean_value = value.strip()
@@ -40,6 +56,8 @@ class ChatThreadSerializer(serializers.ModelSerializer):
     other_user_phone = serializers.SerializerMethodField()
     other_user_photo = serializers.SerializerMethodField()
     other_user_type = serializers.SerializerMethodField()
+    other_user_online = serializers.SerializerMethodField()
+    other_user_last_seen_at = serializers.SerializerMethodField()
     can_accept = serializers.SerializerMethodField()
     last_message = serializers.SerializerMethodField()
     last_message_at = serializers.SerializerMethodField()
@@ -60,6 +78,8 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             'other_user_phone',
             'other_user_photo',
             'other_user_type',
+            'other_user_online',
+            'other_user_last_seen_at',
             'can_accept',
             'last_message',
             'last_message_at',
@@ -147,6 +167,26 @@ class ChatThreadSerializer(serializers.ModelSerializer):
             return 'client'
         other = obj.worker if obj.client_id == user.id else obj.client
         return getattr(other, 'user_type', 'client') or 'client'
+
+    def _other_user(self, obj):
+        user = self._user()
+        if not user:
+            return None
+        return obj.worker if obj.client_id == user.id else obj.client
+
+    @extend_schema_field(serializers.BooleanField())
+    def get_other_user_online(self, obj):
+        other = self._other_user(obj)
+        if other is None:
+            return False
+        return get_user_online(other.id)
+
+    @extend_schema_field(serializers.DateTimeField(allow_null=True))
+    def get_other_user_last_seen_at(self, obj):
+        other = self._other_user(obj)
+        if other is None:
+            return None
+        return get_user_last_seen(other.id)
 
     @extend_schema_field(serializers.BooleanField())
     def get_can_accept(self, obj):

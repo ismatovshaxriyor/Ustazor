@@ -67,6 +67,10 @@ class ChatMessage(models.Model):
         choices=CHAT_MESSAGE_VISIBILITY_CHOICES.choices,
         default=CHAT_MESSAGE_VISIBILITY_CHOICES.all,
     )
+    delivered_to_client_at = models.DateTimeField(blank=True, null=True)
+    delivered_to_worker_at = models.DateTimeField(blank=True, null=True)
+    read_by_client_at = models.DateTimeField(blank=True, null=True)
+    read_by_worker_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

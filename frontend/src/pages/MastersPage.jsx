@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { authApi } from '../api/client';
-import { formatMoney, normalizeListResponse } from '../utils/format';
+import { normalizeListResponse } from '../utils/format';
 
 function MastersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [query, setQuery] = useState(() => searchParams.get('q') || '');
   const [category, setCategory] = useState(() => searchParams.get('category') || '');
   const [city, setCity] = useState(() => searchParams.get('city') || '');
+  const [minRating, setMinRating] = useState(() => searchParams.get('min_rating') || '');
+  const [sort, setSort] = useState(() => searchParams.get('sort') || 'rating_desc');
   const [masters, setMasters] = useState([]);
   const [directory, setDirectory] = useState([]);
   const [status, setStatus] = useState({ loading: true, error: '' });
@@ -23,8 +25,14 @@ function MastersPage() {
     if (city.trim()) {
       params.set('city', city.trim());
     }
+    if (minRating.trim()) {
+      params.set('min_rating', minRating.trim());
+    }
+    if (sort && sort !== 'rating_desc') {
+      params.set('sort', sort);
+    }
     setSearchParams(params, { replace: true });
-  }, [query, category, city, setSearchParams]);
+  }, [query, category, city, minRating, sort, setSearchParams]);
 
   useEffect(() => {
     let active = true;
@@ -57,6 +65,8 @@ function MastersPage() {
         q: query,
         category,
         city,
+        min_rating: minRating,
+        sort,
       })
       .then((data) => {
         if (!active) {
@@ -79,7 +89,7 @@ function MastersPage() {
     return () => {
       active = false;
     };
-  }, [query, category, city]);
+  }, [query, category, city, minRating, sort]);
 
   const categories = useMemo(() => {
     const values = new Set(directory.map((item) => item.specialization).filter(Boolean));
@@ -133,6 +143,25 @@ function MastersPage() {
             </option>
           ))}
         </select>
+        <select
+          className="input"
+          value={minRating || 'all'}
+          onChange={(event) => setMinRating(event.target.value === 'all' ? '' : event.target.value)}
+        >
+          <option value="all">Har qanday reyting</option>
+          <option value="4.5">4.5+ reyting</option>
+          <option value="4">4.0+ reyting</option>
+          <option value="3">3.0+ reyting</option>
+        </select>
+        <select
+          className="input"
+          value={sort}
+          onChange={(event) => setSort(event.target.value)}
+        >
+          <option value="rating_desc">Reyting: yuqoridan</option>
+          <option value="rating_asc">Reyting: pastdan</option>
+          <option value="newest">So`nggi yangilangan</option>
+        </select>
       </div>
 
       {status.loading ? (
@@ -160,7 +189,11 @@ function MastersPage() {
 
               <div className="listing-footer">
                 <div>
-                  <p className="price">{formatMoney(master.min_order_price)}</p>
+                  <p className="price">
+                    {master.rating_count > 0
+                      ? `⭐ ${Number(master.rating_avg || 0).toFixed(1)} (${master.rating_count})`
+                      : '⭐ Reyting yo`q'}
+                  </p>
                   <p className="muted">
                     {master.is_available ? 'Buyurtma qabul qiladi' : 'Hozir band'}
                   </p>
