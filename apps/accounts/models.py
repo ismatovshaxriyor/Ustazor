@@ -42,7 +42,11 @@ class CustomUserManager(BaseUserManager):
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True, null=True)
+    clerk_user_id = models.CharField(max_length=128, unique=True, null=True, blank=True)
     phone_number = models.CharField(max_length=15, null=False, unique=True)
+    secondary_phone_number = models.CharField(max_length=15, null=True, blank=True)
+    telegram_username = models.CharField(max_length=64, null=True, blank=True)
+    instagram_username = models.CharField(max_length=64, null=True, blank=True)
     full_name = models.CharField(max_length=30, null=True, blank=True)
     date_joined = models.DateTimeField(default=timezone.now)
     profile_photo = models.ImageField(
@@ -119,3 +123,32 @@ class WorkerSkill(models.Model):
 
     def __str__(self):
         return f'{self.title} ({self.profile_id})'
+
+
+class WorkerProfileView(models.Model):
+    worker = models.ForeignKey(
+        'accounts.CustomUser',
+        on_delete=models.CASCADE,
+        related_name='received_profile_views',
+    )
+    viewer = models.ForeignKey(
+        'accounts.CustomUser',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sent_profile_views',
+    )
+    viewer_name = models.CharField(max_length=120, blank=True)
+    viewed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Usta profil ko`rishi'
+        verbose_name_plural = 'Usta profil ko`rishlari'
+        ordering = ('-viewed_at',)
+        indexes = [
+            models.Index(fields=['worker', '-viewed_at']),
+            models.Index(fields=['worker', 'viewer', '-viewed_at']),
+        ]
+
+    def __str__(self):
+        return f'WorkerProfileView<worker={self.worker_id}, viewer={self.viewer_id}>'

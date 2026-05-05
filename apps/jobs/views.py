@@ -3,9 +3,9 @@ from django.db.models import Q
 from rest_framework import generics, permissions, status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from apps.jobs.models import JobOrder, ORDER_STATUS_CHOICES
+from apps.accounts.models import USER_TYPE_CHOICES
 from apps.jobs.serializers import JobOrderSerializer, PublicJobOrderSerializer
 
 
@@ -36,10 +36,11 @@ class JobOrderDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 @extend_schema(tags=['Orders'], summary='Mijoz e`lonni yakunlangan holatga o`tkazadi')
-class JobOrderCloseView(APIView):
+class JobOrderCloseView(generics.GenericAPIView):
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = JobOrderSerializer
 
-    @extend_schema(tags=['Orders'], responses=JobOrderSerializer)
+    @extend_schema(tags=['Orders'], request=None, responses=JobOrderSerializer)
     def post(self, request, pk, *args, **kwargs):
         order = JobOrder.objects.select_related('client', 'assigned_worker').filter(
             pk=pk,
@@ -71,7 +72,11 @@ class PublicJobOrderListView(generics.ListAPIView):
     permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
-        queryset = JobOrder.objects.filter(status=ORDER_STATUS_CHOICES.open).select_related('client')
+        user = self.request.user
+        if user and user.is_authenticated and user.user_type == USER_TYPE_CHOICES.client:
+            queryset = JobOrder.objects.filter(client=user).select_related('client')
+        else:
+            queryset = JobOrder.objects.filter(status=ORDER_STATUS_CHOICES.open).select_related('client')
 
         query = (self.request.query_params.get('q') or '').strip()
         category = (self.request.query_params.get('category') or '').strip()

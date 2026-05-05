@@ -15,6 +15,9 @@ class JobOrderApiTests(APITestCase):
         self.client_user = User.objects.create_user(
             email='client@example.com',
             phone_number='+998901111111',
+            secondary_phone_number='+998901111122',
+            telegram_username='client_support',
+            instagram_username='client_insta',
             full_name='Client User',
             user_type=USER_TYPE_CHOICES.client,
             is_active=True,
@@ -204,6 +207,38 @@ class JobOrderApiTests(APITestCase):
         self.assertEqual(response.data['results'][0]['title'], 'Elektrik kerak')
         self.assertEqual(response.data['results'][0]['status'], ORDER_STATUS_CHOICES.open)
 
+    def test_public_vacancy_list_for_client_shows_only_own_orders(self):
+        own_open = JobOrder.objects.create(
+            client=self.client_user,
+            title='Mening ochiq buyurtmam',
+            description='Test',
+            price_type=PRICE_TYPE_CHOICES.negotiable,
+            status=ORDER_STATUS_CHOICES.open,
+        )
+        own_closed = JobOrder.objects.create(
+            client=self.client_user,
+            title='Mening yopiq buyurtmam',
+            description='Test',
+            price_type=PRICE_TYPE_CHOICES.negotiable,
+            status=ORDER_STATUS_CHOICES.completed,
+        )
+        other_open = JobOrder.objects.create(
+            client=self.other_client_user,
+            title='Boshqaning ochiq buyurtmasi',
+            description='Test',
+            price_type=PRICE_TYPE_CHOICES.negotiable,
+            status=ORDER_STATUS_CHOICES.open,
+        )
+
+        self.client.force_authenticate(user=self.client_user)
+        response = self.client.get(reverse('public_vacancy_list'))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result_ids = {item['id'] for item in response.data['results']}
+        self.assertIn(own_open.id, result_ids)
+        self.assertIn(own_closed.id, result_ids)
+        self.assertNotIn(other_open.id, result_ids)
+
     def test_public_vacancy_detail_hides_non_open_orders(self):
         open_order = JobOrder.objects.create(
             client=self.client_user,
@@ -225,6 +260,11 @@ class JobOrderApiTests(APITestCase):
         closed_response = self.client.get(reverse('public_vacancy_detail', kwargs={'pk': closed_order.id}))
 
         self.assertEqual(open_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(open_response.data.get('client_email'), 'client@example.com')
+        self.assertEqual(open_response.data.get('client_phone_number'), '+998901111111')
+        self.assertEqual(open_response.data.get('client_secondary_phone_number'), '+998901111122')
+        self.assertEqual(open_response.data.get('client_telegram_username'), 'client_support')
+        self.assertEqual(open_response.data.get('client_instagram_username'), 'client_insta')
         self.assertEqual(closed_response.status_code, status.HTTP_404_NOT_FOUND)
 
         self.client.force_authenticate(user=self.client_user)

@@ -75,7 +75,12 @@ class JobOrderSerializer(serializers.ModelSerializer):
 
 
 class PublicJobOrderSerializer(serializers.ModelSerializer):
+    client_email = serializers.CharField(source='client.email', read_only=True)
     client_name = serializers.CharField(source='client.full_name', read_only=True)
+    client_phone_number = serializers.CharField(source='client.phone_number', read_only=True)
+    client_secondary_phone_number = serializers.CharField(source='client.secondary_phone_number', read_only=True)
+    client_telegram_username = serializers.CharField(source='client.telegram_username', read_only=True)
+    client_instagram_username = serializers.CharField(source='client.instagram_username', read_only=True)
 
     class Meta:
         model = JobOrder
@@ -90,7 +95,12 @@ class PublicJobOrderSerializer(serializers.ModelSerializer):
             'price_amount',
             'status',
             'due_date',
+            'client_email',
             'client_name',
+            'client_phone_number',
+            'client_secondary_phone_number',
+            'client_telegram_username',
+            'client_instagram_username',
             'created_at',
             'updated_at',
         )

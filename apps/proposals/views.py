@@ -6,7 +6,7 @@ from rest_framework.exceptions import PermissionDenied
 from apps.chat.models import CHAT_MESSAGE_VISIBILITY_CHOICES, ChatMessage
 from apps.chat.realtime import broadcast_chat_message, broadcast_thread_update
 from apps.chat.serializers import ChatMessageSerializer
-from apps.accounts.models import USER_TYPE_CHOICES
+from apps.accounts.models import USER_TYPE_CHOICES, WorkerProfile
 from apps.jobs.models import JobOrder, ORDER_STATUS_CHOICES
 from apps.proposals.models import PROPOSAL_STATUS_CHOICES, VacancyProposal
 from apps.proposals.services import accept_proposal, reject_proposal
@@ -46,29 +46,32 @@ class VacancyProposalCreateView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         proposal = serializer.save()
+        WorkerProfile.objects.get_or_create(user=proposal.worker)
 
         from apps.chat.models import ChatThread
 
         thread, _ = ChatThread.objects.get_or_create(
-            proposal=proposal,
-            defaults={
-                'vacancy': proposal.vacancy,
-                'client': proposal.vacancy.client,
-                'worker': proposal.worker,
-            },
+            client=proposal.vacancy.client,
+            worker=proposal.worker,
+            vacancy=proposal.vacancy,
         )
+
+        proposal.chat_thread = thread
+        proposal.save(update_fields=['chat_thread'])
 
         message_text = (proposal.cover_letter or '').strip()
         if not message_text:
             message_text = "Assalomu alaykum, ushbu e`lon bo`yicha murojaat yubordim."
         if proposal.proposed_price:
             message_text = f"{message_text}\nTaklif narxi: {proposal.proposed_price} so`m"
+        message_text = f"E`lon: {proposal.vacancy.title}\n{message_text}"
 
         first_message = ChatMessage.objects.create(
             thread=thread,
             sender=proposal.worker,
             body=message_text,
         )
+        thread.save(update_fields=['updated_at'])
         broadcast_chat_message(thread.id, ChatMessageSerializer(first_message).data)
 
 
@@ -129,18 +132,22 @@ class ProposalStatusUpdateView(generics.UpdateAPIView):
 
         serializer.instance = updated
 
-        thread = getattr(updated, 'chat_thread', None)
+        thread = updated.chat_thread
         if thread is not None:
+            if thread.vacancy_id != updated.vacancy_id:
+                thread.vacancy = updated.vacancy
+                thread.save(update_fields=['vacancy', 'updated_at'])
             visibility = CHAT_MESSAGE_VISIBILITY_CHOICES.all
             if next_status == PROPOSAL_STATUS_CHOICES.accepted:
                 visibility = CHAT_MESSAGE_VISIBILITY_CHOICES.worker_only
             system_message = ChatMessage.objects.create(
                 thread=thread,
                 sender=self.request.user,
-                body=notification_text,
+                body=f"E`lon: {updated.vacancy.title}\n{notification_text}",
                 is_system=True,
                 visibility=visibility,
             )
+            thread.save(update_fields=['updated_at'])
             broadcast_chat_message(thread.id, ChatMessageSerializer(system_message).data)
             broadcast_thread_update(
                 thread.id,

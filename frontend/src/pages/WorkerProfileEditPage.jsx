@@ -1,5 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Briefcase,
+  ImagePlus,
+  Info,
+  Instagram,
+  MapPin,
+  Phone,
+  PhoneCall,
+  Save,
+  Send,
+  Trash2,
+  User,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { resolveMediaUrl } from '../utils/media';
 
@@ -15,6 +29,9 @@ function WorkerProfileEditPage() {
   const [form, setForm] = useState({
     fullName: '',
     phoneNumber: '',
+    secondaryPhoneNumber: '',
+    telegramUsername: '',
+    instagramUsername: '',
     specialization: '',
     experienceYears: 0,
     serviceCity: '',
@@ -23,6 +40,9 @@ function WorkerProfileEditPage() {
   });
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState('');
+  const [profileUserType, setProfileUserType] = useState('worker');
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const [hasCustomPhoto, setHasCustomPhoto] = useState(false);
   const [status, setStatus] = useState({ loading: true, saving: false, error: '', success: '' });
 
   useEffect(() => {
@@ -41,13 +61,26 @@ function WorkerProfileEditPage() {
         setForm({
           fullName: me.full_name || '',
           phoneNumber: me.phone_number || '',
+          secondaryPhoneNumber: me.secondary_phone_number || '',
+          telegramUsername: me.telegram_username || '',
+          instagramUsername: me.instagram_username || '',
           specialization: worker.specialization || '',
           experienceYears: worker.experience_years ?? 0,
           serviceCity: worker.service_city || '',
           about: worker.about || '',
           isAvailable: Boolean(worker.is_available),
         });
-        setPhotoPreview(resolveMediaUrl(me.profile_photo_url, { userType: 'worker' }));
+        const nextUserType = me.user_type || 'worker';
+        const rawPhotoUrl = `${me.profile_photo_url || ''}`;
+        const isDefaultPhoto =
+          !rawPhotoUrl
+          || rawPhotoUrl.includes('default_client.png')
+          || rawPhotoUrl.includes('default_worker.png')
+          || rawPhotoUrl.includes('default_user.png');
+        setProfileUserType(nextUserType);
+        setHasCustomPhoto(!isDefaultPhoto);
+        setRemovePhoto(false);
+        setPhotoPreview(resolveMediaUrl(rawPhotoUrl, { userType: nextUserType }));
         setStatus({ loading: false, saving: false, error: '', success: '' });
       })
       .catch((error) => {
@@ -78,8 +111,17 @@ function WorkerProfileEditPage() {
       return;
     }
 
+    setRemovePhoto(false);
+    setHasCustomPhoto(true);
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const onRemovePhoto = () => {
+    setPhotoFile(null);
+    setRemovePhoto(true);
+    setHasCustomPhoto(false);
+    setPhotoPreview(resolveMediaUrl('', { userType: profileUserType }));
   };
 
   const onSubmit = async (event) => {
@@ -89,8 +131,14 @@ function WorkerProfileEditPage() {
     const userPayload = new FormData();
     userPayload.append('full_name', form.fullName);
     userPayload.append('phone_number', form.phoneNumber);
+    userPayload.append('secondary_phone_number', form.secondaryPhoneNumber);
+    userPayload.append('telegram_username', form.telegramUsername);
+    userPayload.append('instagram_username', form.instagramUsername);
     if (photoFile) {
       userPayload.append('profile_photo', photoFile);
+    }
+    if (removePhoto && !photoFile) {
+      userPayload.append('remove_profile_photo', 'true');
     }
 
     const workerPayload = {
@@ -134,6 +182,7 @@ function WorkerProfileEditPage() {
         <div className="profile-edit-head">
           <h2>Usta profilini tahrirlash</h2>
           <Link to="/profile" className="button button-ghost">
+            <ArrowLeft size={16} />
             Orqaga
           </Link>
         </div>
@@ -149,9 +198,22 @@ function WorkerProfileEditPage() {
             <div className="profile-photo-editor">
               <img src={photoPreview} alt="Profil rasmi" className="profile-avatar profile-avatar-editor" />
               <div className="profile-photo-actions">
-                <label className="button button-ghost" htmlFor="worker-profile-photo-input">
-                  Rasm tanlash
-                </label>
+                <div className="profile-photo-action-row">
+                  <label className="button button-ghost" htmlFor="worker-profile-photo-input">
+                    <ImagePlus size={16} />
+                    Rasm tanlash
+                  </label>
+                  {hasCustomPhoto ? (
+                    <button
+                      type="button"
+                      className="button button-ghost danger-button"
+                      onClick={onRemovePhoto}
+                    >
+                      <Trash2 size={16} />
+                      Rasmni olib tashlash
+                    </button>
+                  ) : null}
+                </div>
                 <input
                   id="worker-profile-photo-input"
                   type="file"
@@ -165,7 +227,8 @@ function WorkerProfileEditPage() {
 
             <div className="profile-grid">
               <div>
-                <label className="label" htmlFor="worker-full-name">
+                <label className="label label-with-icon" htmlFor="worker-full-name">
+                  <User size={14} />
                   To`liq ism
                 </label>
                 <input
@@ -177,7 +240,8 @@ function WorkerProfileEditPage() {
                 />
               </div>
               <div>
-                <label className="label" htmlFor="worker-phone">
+                <label className="label label-with-icon" htmlFor="worker-phone">
+                  <Phone size={14} />
                   Telefon raqam
                 </label>
                 <input
@@ -188,11 +252,51 @@ function WorkerProfileEditPage() {
                   required
                 />
               </div>
+              <div>
+                <label className="label label-with-icon" htmlFor="worker-telegram">
+                  <Send size={14} />
+                  Telegram username
+                </label>
+                <input
+                  id="worker-telegram"
+                  className="input"
+                  value={form.telegramUsername}
+                  onChange={updateField('telegramUsername')}
+                  placeholder="@username"
+                />
+              </div>
+              <div>
+                <label className="label label-with-icon" htmlFor="worker-secondary-phone">
+                  <PhoneCall size={14} />
+                  Qo`shimcha telefon
+                </label>
+                <input
+                  id="worker-secondary-phone"
+                  className="input"
+                  value={form.secondaryPhoneNumber}
+                  onChange={updateField('secondaryPhoneNumber')}
+                  placeholder="+998901112233"
+                />
+              </div>
+              <div>
+                <label className="label label-with-icon" htmlFor="worker-instagram">
+                  <Instagram size={14} />
+                  Instagram username
+                </label>
+                <input
+                  id="worker-instagram"
+                  className="input"
+                  value={form.instagramUsername}
+                  onChange={updateField('instagramUsername')}
+                  placeholder="@username"
+                />
+              </div>
             </div>
 
             <div className="profile-grid">
               <div>
-                <label className="label" htmlFor="worker-specialization">
+                <label className="label label-with-icon" htmlFor="worker-specialization">
+                  <Briefcase size={14} />
                   Mutaxassislik
                 </label>
                 <input
@@ -220,7 +324,8 @@ function WorkerProfileEditPage() {
 
             <div className="profile-grid">
               <div>
-                <label className="label" htmlFor="worker-city">
+                <label className="label label-with-icon" htmlFor="worker-city">
+                  <MapPin size={14} />
                   Xizmat hududi
                 </label>
                 <input
@@ -234,7 +339,8 @@ function WorkerProfileEditPage() {
             </div>
 
             <div>
-              <label className="label" htmlFor="worker-about">
+              <label className="label label-with-icon" htmlFor="worker-about">
+                <Info size={14} />
                 O`zim haqimda
               </label>
               <textarea
@@ -256,6 +362,7 @@ function WorkerProfileEditPage() {
               Hozir buyurtmalarni qabul qilaman
             </label>
             <button className="button button-primary" type="submit" disabled={status.saving}>
+              <Save size={16} />
               {status.saving ? 'Saqlanmoqda...' : 'Saqlash'}
             </button>
             <Link className="button button-ghost" to="/profile">

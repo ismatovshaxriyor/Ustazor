@@ -5,11 +5,13 @@ from apps.chat.views import (
     ChatMarkReadView,
     ChatMessageListCreateView,
     ChatRejectWorkerView,
+    ChatThreadStartView,
     ChatThreadListView,
 )
 
 urlpatterns = [
     path('threads/', ChatThreadListView.as_view(), name='chat_thread_list'),
+    path('threads/start/', ChatThreadStartView.as_view(), name='chat_thread_start'),
     path('threads/<int:thread_id>/messages/', ChatMessageListCreateView.as_view(), name='chat_message_list_create'),
     path('threads/<int:thread_id>/read/', ChatMarkReadView.as_view(), name='chat_mark_read'),
     path('threads/<int:thread_id>/accept-worker/', ChatAcceptWorkerView.as_view(), name='chat_accept_worker'),

@@ -22,7 +22,7 @@ function ToastContainer() {
     };
 
     const emitFormMessageToasts = () => {
-      const nodes = document.querySelectorAll('.form-message:not([data-toast-bridged="1"])');
+      const nodes = document.querySelectorAll('.form-message');
       if (nodes.length === 0) {
         return;
       }
@@ -31,10 +31,17 @@ function ToastContainer() {
 
       nodes.forEach((node) => {
         const message = node.textContent?.trim();
-        node.setAttribute('data-toast-bridged', '1');
         if (!message) {
+          node.removeAttribute('data-toast-message');
           return;
         }
+
+        const lastBridgedMessage = node.getAttribute('data-toast-message') || '';
+        node.setAttribute('data-toast-bridged', '1');
+        if (lastBridgedMessage === message) {
+          return;
+        }
+        node.setAttribute('data-toast-message', message);
 
         let type = 'info';
         let title = "Ma'lumot";
@@ -58,6 +65,8 @@ function ToastContainer() {
           type,
           title,
           message,
+          dedupeKey,
+          dedupeMs: 5000,
           duration: 3000,
         });
       });

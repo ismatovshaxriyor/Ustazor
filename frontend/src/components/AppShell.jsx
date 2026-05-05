@@ -6,7 +6,14 @@ import { useLocation } from 'react-router-dom';
 function AppShell({ children }) {
   const location = useLocation();
   const isHome = location.pathname === '/';
-  const mainClassName = isHome ? 'page-content-home' : 'container page-content';
+  const isChat = location.pathname.startsWith('/chat');
+  const isProfile = location.pathname.startsWith('/profile');
+  const isOrders = location.pathname.startsWith('/orders');
+  const mainClassName = isHome
+    ? 'page-content-home'
+    : (isChat || isProfile || isOrders)
+      ? 'container container-chat page-content'
+      : 'container page-content';
 
   return (
     <div className="app-frame">

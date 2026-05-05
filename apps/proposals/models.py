@@ -24,6 +24,13 @@ class VacancyProposal(models.Model):
         on_delete=models.CASCADE,
         related_name='vacancy_proposals',
     )
+    chat_thread = models.ForeignKey(
+        'chat.ChatThread',
+        on_delete=models.SET_NULL,
+        related_name='proposals',
+        null=True,
+        blank=True,
+    )
     cover_letter = models.TextField(blank=True)
     proposed_price = models.DecimalField(
         max_digits=12,

@@ -91,6 +91,10 @@ function WorkerDashboardPage() {
           <p className="dashboard-label">Yakunlangan ishlar</p>
           <h3>{dashboard?.completed_orders_count || 0}</h3>
         </article>
+        <article className="card dashboard-stat">
+          <p className="dashboard-label">Profil ko`rishlari</p>
+          <h3>{dashboard?.profile_views_count || 0}</h3>
+        </article>
       </div>
 
       <div className="dual-grid reveal-up delay-2">
@@ -145,7 +149,7 @@ function WorkerDashboardPage() {
                         Chat
                       </Link>
                     ) : (
-                      <Link to={`/elonlar/${proposal.vacancy_id}`} className="button button-ghost">
+                      <Link to={`/elonlar?vacancy=${proposal.vacancy_id}`} className="button button-ghost">
                         Ko`rish
                       </Link>
                     )}
@@ -154,6 +158,22 @@ function WorkerDashboardPage() {
               ))}
             </div>
           )}
+
+          <div className="mini-vacancy-list">
+            <div className="section-row-head">
+              <h3>Profilni ko`rganlar</h3>
+            </div>
+            {Array.isArray(dashboard?.recent_profile_viewers) && dashboard.recent_profile_viewers.length > 0 ? (
+              dashboard.recent_profile_viewers.slice(0, 5).map((viewer) => (
+                <article key={`${viewer.viewer_id}-${viewer.viewed_at}`} className="vacancy-snippet">
+                  <h4>{viewer.viewer_name || 'Foydalanuvchi'}</h4>
+                  <p className="muted">{new Date(viewer.viewed_at).toLocaleString()}</p>
+                </article>
+              ))
+            ) : (
+              <p className="muted">Hozircha profilingizni ko`rganlar yo`q.</p>
+            )}
+          </div>
         </article>
       </div>
 

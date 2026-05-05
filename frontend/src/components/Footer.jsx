@@ -46,9 +46,9 @@ function Footer() {
             <h4>Platforma</h4>
             <ul className="footer-list">
               <li><Link to="/about" className="footer-link">Biz haqimizda</Link></li>
-              <li><Link to="/masters" className="footer-link">Ustalarni qidirish</Link></li>
-              <li><Link to="/elonlar" className="footer-link">Ish e'lonlari</Link></li>
               <li><Link to="/blog" className="footer-link">Blog</Link></li>
+              <li><Link to="/terms" className="footer-link">Terms of Service</Link></li>
+              <li><Link to="/privacy" className="footer-link">Privacy Policy</Link></li>
             </ul>
           </div>
         </div>

@@ -18,7 +18,12 @@ function Header() {
   const { isAuthenticated, logout, user } = useAuth();
   const { unreadCount } = useNotifications();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const navItems = [...baseNavItems];
+  const navItems = baseNavItems.map((item) => {
+    if (item.to === '/elonlar' && isAuthenticated && user?.user_type === 'client') {
+      return { to: '/orders', label: "Mening e'lonlarim" };
+    }
+    return item;
+  });
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 

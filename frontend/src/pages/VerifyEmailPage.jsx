@@ -7,6 +7,10 @@ function VerifyEmailPage() {
   const { verifyEmail, resendActivation } = useAuth();
   const [searchParams] = useSearchParams();
   const initialEmail = useMemo(() => searchParams.get('email') || '', [searchParams]);
+  const userType = useMemo(
+    () => (searchParams.get('user_type') === 'worker' ? 'worker' : 'client'),
+    [searchParams],
+  );
 
   const [form, setForm] = useState({
     email: initialEmail,
@@ -27,9 +31,17 @@ function VerifyEmailPage() {
       setStatus({
         loading: false,
         error: '',
-        success: 'Email tasdiqlandi. Bosh sahifaga o`tkazilmoqda...',
+        success:
+          userType === 'worker'
+            ? 'Email tasdiqlandi. Endi onboardingni yakunlash uchun tizimga kiring.'
+            : 'Email tasdiqlandi. Bosh sahifaga o`tkazilmoqda...',
       });
-      window.setTimeout(() => navigate('/', { replace: true }), 900);
+      if (userType === 'worker') {
+        const next = encodeURIComponent('/auth/worker-onboarding');
+        window.setTimeout(() => navigate(`/auth/login?next=${next}`, { replace: true }), 900);
+      } else {
+        window.setTimeout(() => navigate('/', { replace: true }), 900);
+      }
     } catch (error) {
       setStatus({
         loading: false,

@@ -1,6 +1,7 @@
 import re
 import shutil
 import tempfile
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.core import mail
@@ -11,7 +12,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.accounts.models import USER_TYPE_CHOICES, WorkerProfile, WorkerSkill
+from apps.accounts.models import USER_TYPE_CHOICES, WorkerProfile, WorkerProfileView, WorkerSkill
 from apps.accounts.services.activation import get_activation_payload
 
 User = get_user_model()
@@ -136,6 +137,19 @@ class AuthApiTests(APITestCase):
         self.assertIn('email', response.data)
         self.assertIn('allaqachon', str(response.data['email']).lower())
 
+    def test_register_allows_blank_secondary_phone_number(self):
+        payload = self._register_payload(
+            email='optional-secondary@example.com',
+            phone_number='+998900000099',
+            secondary_phone_number='',
+        )
+
+        response = self.client.post(reverse('register'), payload, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        user = User.objects.get(email=payload['email'])
+        self.assertEqual(user.secondary_phone_number, '')
+
     def test_login_rejects_unverified_user(self):
         response = self.client.post(
             reverse('token_obtain_pair'),
@@ -247,6 +261,47 @@ class AuthApiTests(APITestCase):
         self.verified_user.refresh_from_db()
         self.assertEqual(self.verified_user.full_name, payload['full_name'])
         self.assertEqual(self.verified_user.phone_number, payload['phone_number'])
+
+    def test_me_patch_allows_clearing_secondary_phone(self):
+        self.verified_user.secondary_phone_number = '+998901119900'
+        self.verified_user.save(update_fields=['secondary_phone_number'])
+
+        login_response = self.client.post(
+            reverse('token_obtain_pair'),
+            {'email': self.verified_user.email, 'password': self.password},
+            format='json',
+        )
+        access = login_response.data['access']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+
+        response = self.client.patch(
+            reverse('me'),
+            {'secondary_phone_number': ''},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.verified_user.refresh_from_db()
+        self.assertEqual(self.verified_user.secondary_phone_number, '')
+
+    def test_me_patch_allows_updating_user_type(self):
+        login_response = self.client.post(
+            reverse('token_obtain_pair'),
+            {'email': self.verified_user.email, 'password': self.password},
+            format='json',
+        )
+        access = login_response.data['access']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+
+        response = self.client.patch(
+            reverse('me'),
+            {'user_type': USER_TYPE_CHOICES.worker},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.verified_user.refresh_from_db()
+        self.assertEqual(self.verified_user.user_type, USER_TYPE_CHOICES.worker)
 
     def test_me_patch_rejects_duplicate_phone(self):
         login_response = self.client.post(
@@ -415,6 +470,40 @@ class AuthApiTests(APITestCase):
         self.assertEqual(dashboard_response.status_code, status.HTTP_200_OK)
         self.assertIn('profile', dashboard_response.data)
         self.assertEqual(dashboard_response.data['skills_count'], 1)
+        self.assertEqual(dashboard_response.data['profile_views_count'], 0)
+        self.assertEqual(dashboard_response.data['recent_profile_viewers'], [])
+
+    def test_worker_dashboard_includes_profile_view_stats(self):
+        viewer = User.objects.create_user(
+            email='viewer@example.com',
+            phone_number='+998901230000',
+            full_name='Profile Viewer',
+            user_type=USER_TYPE_CHOICES.client,
+            is_active=True,
+            is_verified=True,
+            password=self.password,
+        )
+        WorkerProfileView.objects.create(
+            worker=self.worker_user,
+            viewer=viewer,
+            viewer_name=viewer.full_name,
+        )
+
+        login_response = self.client.post(
+            reverse('token_obtain_pair'),
+            {'email': self.worker_user.email, 'password': self.password},
+            format='json',
+        )
+        access = login_response.data['access']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+
+        dashboard_response = self.client.get(reverse('worker_dashboard'))
+
+        self.assertEqual(dashboard_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(dashboard_response.data['profile_views_count'], 1)
+        self.assertEqual(len(dashboard_response.data['recent_profile_viewers']), 1)
+        self.assertEqual(dashboard_response.data['recent_profile_viewers'][0]['viewer_id'], viewer.id)
+        self.assertEqual(dashboard_response.data['recent_profile_viewers'][0]['viewer_name'], viewer.full_name)
 
     def test_public_worker_list_supports_search_filters(self):
         profile = WorkerProfile.objects.create(
@@ -458,6 +547,39 @@ class AuthApiTests(APITestCase):
         self.assertEqual(len(response.data['results']), 1)
         self.assertEqual(response.data['results'][0]['specialization'], 'Elektrik')
 
+    def test_public_worker_list_filters_by_min_experience(self):
+        experienced_profile = WorkerProfile.objects.create(
+            user=self.worker_user,
+            specialization='Quruvchi',
+            service_city='Andijon',
+            experience_years=8,
+            is_available=True,
+        )
+
+        junior_worker = User.objects.create_user(
+            email='worker-junior@example.com',
+            phone_number='+998907700022',
+            full_name='Yangi Usta',
+            user_type=USER_TYPE_CHOICES.worker,
+            is_active=True,
+            is_verified=True,
+            password=self.password,
+        )
+        WorkerProfile.objects.create(
+            user=junior_worker,
+            specialization='Quruvchi',
+            service_city='Andijon',
+            experience_years=2,
+            is_available=True,
+        )
+
+        self.client.credentials()
+        response = self.client.get(f"{reverse('public_worker_list')}?category=quruvchi&min_experience=5")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['results']), 1)
+        self.assertEqual(response.data['results'][0]['id'], experienced_profile.id)
+
     def test_public_worker_detail_returns_active_skills(self):
         profile = WorkerProfile.objects.create(
             user=self.worker_user,
@@ -476,3 +598,103 @@ class AuthApiTests(APITestCase):
         self.assertEqual(response.data['id'], profile.id)
         self.assertEqual(len(response.data['skills']), 1)
         self.assertEqual(response.data['skills'][0]['title'], 'Devor bo`yash')
+
+    def test_public_worker_detail_tracks_authenticated_profile_views(self):
+        profile = WorkerProfile.objects.create(
+            user=self.worker_user,
+            specialization='Malyar',
+            service_city='Samarqand',
+            experience_years=5,
+            is_available=True,
+        )
+
+        viewer = User.objects.create_user(
+            email='viewer2@example.com',
+            phone_number='+998901231111',
+            full_name='Viewer User',
+            user_type=USER_TYPE_CHOICES.client,
+            is_active=True,
+            is_verified=True,
+            password=self.password,
+        )
+        login_response = self.client.post(
+            reverse('token_obtain_pair'),
+            {'email': viewer.email, 'password': self.password},
+            format='json',
+        )
+        access = login_response.data['access']
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access}')
+
+        response = self.client.get(reverse('public_worker_detail', kwargs={'pk': profile.id}))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(WorkerProfileView.objects.filter(worker=self.worker_user, viewer=viewer).count(), 1)
+
+        second_response = self.client.get(reverse('public_worker_detail', kwargs={'pk': profile.id}))
+        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(WorkerProfileView.objects.filter(worker=self.worker_user, viewer=viewer).count(), 1)
+
+    @mock.patch('apps.accounts.views._decode_clerk_session_token')
+    def test_clerk_exchange_returns_tokens_for_existing_user(self, decode_token_mock):
+        decode_token_mock.return_value = {'sub': 'user_123', 'iss': 'https://example.clerk.accounts.dev'}
+
+        response = self.client.post(
+            reverse('clerk_exchange'),
+            {
+                'email': self.verified_user.email,
+                'full_name': self.verified_user.full_name,
+                'user_type': USER_TYPE_CHOICES.client,
+            },
+            format='json',
+            HTTP_AUTHORIZATION='Bearer fake-clerk-session-token',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('access', response.data)
+        self.assertIn('refresh', response.data)
+        self.assertEqual(response.data['user']['email'], self.verified_user.email)
+        self.assertFalse(response.data['phone_required'])
+        self.assertFalse(response.data['user_type_required'])
+
+    @mock.patch('apps.accounts.views._decode_clerk_session_token')
+    def test_clerk_exchange_creates_user_when_email_not_found(self, decode_token_mock):
+        decode_token_mock.return_value = {'sub': 'user_234', 'iss': 'https://example.clerk.accounts.dev'}
+        email = 'clerk-new@example.com'
+
+        response = self.client.post(
+            reverse('clerk_exchange'),
+            {
+                'email': email,
+                'full_name': 'Clerk New User',
+                'user_type': USER_TYPE_CHOICES.worker,
+            },
+            format='json',
+            HTTP_AUTHORIZATION='Bearer fake-clerk-session-token',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['phone_required'])
+        self.assertFalse(response.data['user_type_required'])
+        created_user = User.objects.get(email=email)
+        self.assertEqual(created_user.user_type, USER_TYPE_CHOICES.worker)
+        self.assertTrue(created_user.is_active)
+        self.assertTrue(created_user.is_verified)
+        self.assertTrue(created_user.phone_number)
+
+    @mock.patch('apps.accounts.views._decode_clerk_session_token')
+    def test_clerk_exchange_requires_user_type_when_missing_for_new_user(self, decode_token_mock):
+        decode_token_mock.return_value = {'sub': 'user_345', 'iss': 'https://example.clerk.accounts.dev'}
+        email = 'clerk-no-role@example.com'
+
+        response = self.client.post(
+            reverse('clerk_exchange'),
+            {
+                'email': email,
+                'full_name': 'No Role User',
+            },
+            format='json',
+            HTTP_AUTHORIZATION='Bearer fake-clerk-session-token',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['user_type_required'])

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { ArrowLeft, ImagePlus, Instagram, Phone, PhoneCall, Save, Send, Trash2, User, UserX } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { resolveMediaUrl } from '../utils/media';
 
@@ -9,9 +10,15 @@ function ClientProfileEditPage() {
   const [form, setForm] = useState({
     fullName: '',
     phoneNumber: '',
+    secondaryPhoneNumber: '',
+    telegramUsername: '',
+    instagramUsername: '',
   });
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState('');
+  const [profileUserType, setProfileUserType] = useState('client');
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const [hasCustomPhoto, setHasCustomPhoto] = useState(false);
   const [status, setStatus] = useState({ loading: true, saving: false, error: '', success: '' });
 
   useEffect(() => {
@@ -29,8 +36,21 @@ function ClientProfileEditPage() {
         setForm({
           fullName: me.full_name || '',
           phoneNumber: me.phone_number || '',
+          secondaryPhoneNumber: me.secondary_phone_number || '',
+          telegramUsername: me.telegram_username || '',
+          instagramUsername: me.instagram_username || '',
         });
-        setPhotoPreview(resolveMediaUrl(me.profile_photo_url, { userType: me.user_type || 'client' }));
+        const nextUserType = me.user_type || 'client';
+        const rawPhotoUrl = `${me.profile_photo_url || ''}`;
+        const isDefaultPhoto =
+          !rawPhotoUrl
+          || rawPhotoUrl.includes('default_client.png')
+          || rawPhotoUrl.includes('default_worker.png')
+          || rawPhotoUrl.includes('default_user.png');
+        setProfileUserType(nextUserType);
+        setHasCustomPhoto(!isDefaultPhoto);
+        setRemovePhoto(false);
+        setPhotoPreview(resolveMediaUrl(rawPhotoUrl, { userType: nextUserType }));
         setStatus({ loading: false, saving: false, error: '', success: '' });
       })
       .catch((error) => {
@@ -61,8 +81,17 @@ function ClientProfileEditPage() {
       return;
     }
 
+    setRemovePhoto(false);
+    setHasCustomPhoto(true);
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const onRemovePhoto = () => {
+    setPhotoFile(null);
+    setRemovePhoto(true);
+    setHasCustomPhoto(false);
+    setPhotoPreview(resolveMediaUrl('', { userType: profileUserType }));
   };
 
   const onSubmit = async (event) => {
@@ -72,8 +101,14 @@ function ClientProfileEditPage() {
     const payload = new FormData();
     payload.append('full_name', form.fullName);
     payload.append('phone_number', form.phoneNumber);
+    payload.append('secondary_phone_number', form.secondaryPhoneNumber);
+    payload.append('telegram_username', form.telegramUsername);
+    payload.append('instagram_username', form.instagramUsername);
     if (photoFile) {
       payload.append('profile_photo', photoFile);
+    }
+    if (removePhoto && !photoFile) {
+      payload.append('remove_profile_photo', 'true');
     }
 
     try {
@@ -125,10 +160,11 @@ function ClientProfileEditPage() {
         <div className="profile-edit-head">
           <h2>Profilni tahrirlash</h2>
           <Link to="/profile" className="button button-ghost">
+            <ArrowLeft size={16} />
             Orqaga
           </Link>
         </div>
-        <p className="auth-subtitle">Rasm, ism va telefon ma`lumotlarini yangilang.</p>
+        <p className="auth-subtitle">Rasm, ism va bog`lanish ma`lumotlarini yangilang.</p>
 
         {status.loading ? (
           <p className="muted">Yuklanmoqda...</p>
@@ -141,9 +177,22 @@ function ClientProfileEditPage() {
                 className="profile-avatar profile-avatar-editor"
               />
               <div className="profile-photo-actions">
-                <label className="button button-ghost" htmlFor="profile-photo-input">
-                  Rasm tanlash
-                </label>
+                <div className="profile-photo-action-row">
+                  <label className="button button-ghost" htmlFor="profile-photo-input">
+                    <ImagePlus size={16} />
+                    Rasm tanlash
+                  </label>
+                  {hasCustomPhoto ? (
+                    <button
+                      type="button"
+                      className="button button-ghost danger-button"
+                      onClick={onRemovePhoto}
+                    >
+                      <Trash2 size={16} />
+                      Rasmni olib tashlash
+                    </button>
+                  ) : null}
+                </div>
                 <input
                   id="profile-photo-input"
                   type="file"
@@ -157,7 +206,8 @@ function ClientProfileEditPage() {
 
             <div className="profile-grid">
               <div>
-                <label className="label" htmlFor="profile-full-name">
+                <label className="label label-with-icon" htmlFor="profile-full-name">
+                  <User size={14} />
                   To`liq ism
                 </label>
                 <input
@@ -170,7 +220,8 @@ function ClientProfileEditPage() {
               </div>
 
               <div>
-                <label className="label" htmlFor="profile-phone">
+                <label className="label label-with-icon" htmlFor="profile-phone">
+                  <Phone size={14} />
                   Telefon raqam
                 </label>
                 <input
@@ -181,9 +232,52 @@ function ClientProfileEditPage() {
                   required
                 />
               </div>
+
+              <div>
+                <label className="label label-with-icon" htmlFor="profile-secondary-phone">
+                  <PhoneCall size={14} />
+                  Qo`shimcha telefon
+                </label>
+                <input
+                  id="profile-secondary-phone"
+                  className="input"
+                  value={form.secondaryPhoneNumber}
+                  onChange={updateField('secondaryPhoneNumber')}
+                  placeholder="+998901112233"
+                />
+              </div>
+
+              <div>
+                <label className="label label-with-icon" htmlFor="profile-telegram">
+                  <Send size={14} />
+                  Telegram username
+                </label>
+                <input
+                  id="profile-telegram"
+                  className="input"
+                  value={form.telegramUsername}
+                  onChange={updateField('telegramUsername')}
+                  placeholder="@username"
+                />
+              </div>
+
+              <div>
+                <label className="label label-with-icon" htmlFor="profile-instagram">
+                  <Instagram size={14} />
+                  Instagram username
+                </label>
+                <input
+                  id="profile-instagram"
+                  className="input"
+                  value={form.instagramUsername}
+                  onChange={updateField('instagramUsername')}
+                  placeholder="@username"
+                />
+              </div>
             </div>
 
             <button className="button button-primary" type="submit" disabled={status.saving}>
+              <Save size={16} />
               {status.saving ? 'Saqlanmoqda...' : 'Saqlash'}
             </button>
             <button
@@ -192,6 +286,7 @@ function ClientProfileEditPage() {
               onClick={onDeleteAccount}
               disabled={status.saving}
             >
+              <UserX size={16} />
               Akkauntni o`chirish
             </button>
           </form>

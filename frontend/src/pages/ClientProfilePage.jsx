@@ -9,17 +9,6 @@ import {
   PROPOSAL_STATUS_LABELS as proposalStatusLabels,
 } from '../utils/format';
 
-const vacancyInitialForm = {
-  title: '',
-  description: '',
-  category: '',
-  city: '',
-  address: '',
-  dueDate: '',
-  priceType: 'negotiable',
-  priceAmount: '',
-};
-
 const reviewInitialForm = {
   rating: '5',
   comment: '',
@@ -41,12 +30,10 @@ function ClientProfilePage() {
   const [status, setStatus] = useState({ loading: true, error: '' });
   const [ordersStatus, setOrdersStatus] = useState({ loading: true, error: '' });
   const [proposalsStatus, setProposalsStatus] = useState({ loading: true, error: '' });
-  const [isVacancyModalOpen, setIsVacancyModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedReviewOrder, setSelectedReviewOrder] = useState(null);
-  const [vacancyForm, setVacancyForm] = useState(vacancyInitialForm);
   const [vacancyStatus, setVacancyStatus] = useState({ saving: false, error: '', success: '' });
   const [reviewForm, setReviewForm] = useState(reviewInitialForm);
   const [reviewStatus, setReviewStatus] = useState({ saving: false, error: '', success: '' });
@@ -98,19 +85,6 @@ function ClientProfilePage() {
     };
   }, [isAuthenticated, fetchMe, tokens.access, user]);
 
-  const updateVacancyField = (field) => (event) => {
-    setVacancyForm((prev) => ({ ...prev, [field]: event.target.value }));
-  };
-
-  const openVacancyModal = () => {
-    setVacancyStatus({ saving: false, error: '', success: '' });
-    setIsVacancyModalOpen(true);
-  };
-
-  const closeVacancyModal = () => {
-    setIsVacancyModalOpen(false);
-  };
-
   const openProposalModal = (order) => {
     setSelectedOrder(order);
     setIsProposalModalOpen(true);
@@ -144,53 +118,6 @@ function ClientProfilePage() {
     acc[proposal.vacancy_id] += 1;
     return acc;
   }, {});
-
-  const onCreateVacancy = async (event) => {
-    event.preventDefault();
-    setVacancyStatus({ saving: true, error: '', success: '' });
-
-    if (vacancyForm.priceType === 'fixed' && !vacancyForm.priceAmount) {
-      setVacancyStatus({
-        saving: false,
-        error: 'Aniq narx tanlanganda narx qiymatini kiriting.',
-        success: '',
-      });
-      return;
-    }
-
-    try {
-      const payload = {
-        title: vacancyForm.title,
-        description: vacancyForm.description,
-        category: vacancyForm.category,
-        city: vacancyForm.city,
-        address: vacancyForm.address,
-        price_type: vacancyForm.priceType,
-      };
-      if (vacancyForm.priceType === 'fixed') {
-        payload.price_amount = vacancyForm.priceAmount;
-      }
-      if (vacancyForm.dueDate) {
-        payload.due_date = vacancyForm.dueDate;
-      }
-
-      const created = await authApi.createOrder(payload, tokens.access);
-      setOrders((prev) => [created, ...prev]);
-      setVacancyForm(vacancyInitialForm);
-      setIsVacancyModalOpen(false);
-      setVacancyStatus({
-        saving: false,
-        error: '',
-        success: 'Vakansiya muvaffaqiyatli yaratildi.',
-      });
-    } catch (error) {
-      setVacancyStatus({
-        saving: false,
-        error: error.message || 'Vakansiya yaratishda xatolik yuz berdi.',
-        success: '',
-      });
-    }
-  };
 
   const onReviewFieldChange = (field) => (event) => {
     if (field === 'images') {
@@ -286,14 +213,20 @@ function ClientProfilePage() {
             <h2>{profile?.full_name || 'Foydalanuvchi'}</h2>
             <p className="muted">{profile?.email}</p>
             <p className="muted">{profile?.phone_number}</p>
+            {profile?.secondary_phone_number ? (
+              <p className="muted">{`Qo'shimcha: ${profile.secondary_phone_number}`}</p>
+            ) : null}
+            {profile?.telegram_username ? (
+              <p className="muted">{`Telegram: @${profile.telegram_username}`}</p>
+            ) : null}
+            {profile?.instagram_username ? (
+              <p className="muted">{`Instagram: @${profile.instagram_username}`}</p>
+            ) : null}
           </div>
           <div className="profile-top-actions">
             <Link to="/profile/edit" className="button button-primary">
               Profilni tahrirlash
             </Link>
-            <button type="button" className="button button-ghost" onClick={openVacancyModal}>
-              Vakansiya yaratish
-            </button>
           </div>
         </div>
 
@@ -303,8 +236,8 @@ function ClientProfilePage() {
           </span>
         </div>
 
-        {!isVacancyModalOpen && vacancyStatus.error && <p className="form-message error">{vacancyStatus.error}</p>}
-        {!isVacancyModalOpen && vacancyStatus.success && (
+        {vacancyStatus.error && <p className="form-message error">{vacancyStatus.error}</p>}
+        {vacancyStatus.success && (
           <p className="form-message success">{vacancyStatus.success}</p>
         )}
         {status.error && <p className="form-message error">{status.error}</p>}
@@ -419,145 +352,6 @@ function ClientProfilePage() {
                 ))}
               </div>
             )}
-          </article>
-        </div>
-      )}
-
-      {isVacancyModalOpen && (
-        <div className="modal-backdrop" onClick={closeVacancyModal} role="presentation">
-          <article className="modal-card card" onClick={(event) => event.stopPropagation()}>
-            <div className="section-row-head">
-              <h3>Yangi vakansiya yaratish</h3>
-              <button type="button" className="button button-ghost" onClick={closeVacancyModal}>
-                Yopish
-              </button>
-            </div>
-
-            {isVacancyModalOpen && vacancyStatus.error && <p className="form-message error">{vacancyStatus.error}</p>}
-
-            <form className="stack-small" onSubmit={onCreateVacancy}>
-              <div>
-                <label className="label" htmlFor="vacancy-title">
-                  Sarlavha
-                </label>
-                <input
-                  id="vacancy-title"
-                  className="input"
-                  value={vacancyForm.title}
-                  onChange={updateVacancyField('title')}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="label" htmlFor="vacancy-description">
-                  Tavsif
-                </label>
-                <textarea
-                  id="vacancy-description"
-                  className="input"
-                  rows={4}
-                  value={vacancyForm.description}
-                  onChange={updateVacancyField('description')}
-                  required
-                />
-              </div>
-
-              <div className="profile-grid">
-                <div>
-                  <label className="label" htmlFor="vacancy-category">
-                    Yo`nalish
-                  </label>
-                  <input
-                    id="vacancy-category"
-                    className="input"
-                    value={vacancyForm.category}
-                    onChange={updateVacancyField('category')}
-                    placeholder="Masalan: Elektrik"
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="vacancy-city">
-                    Shahar
-                  </label>
-                  <input
-                    id="vacancy-city"
-                    className="input"
-                    value={vacancyForm.city}
-                    onChange={updateVacancyField('city')}
-                    placeholder="Masalan: Toshkent"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="label" htmlFor="vacancy-address">
-                  Manzil
-                </label>
-                <input
-                  id="vacancy-address"
-                  className="input"
-                  value={vacancyForm.address}
-                  onChange={updateVacancyField('address')}
-                  placeholder="Ixtiyoriy"
-                />
-              </div>
-
-              <div className="profile-grid">
-                <div>
-                  <label className="label" htmlFor="vacancy-price-type">
-                    Narx turi
-                  </label>
-                  <select
-                    id="vacancy-price-type"
-                    className="input"
-                    value={vacancyForm.priceType}
-                    onChange={updateVacancyField('priceType')}
-                  >
-                    <option value="negotiable">Kelishish asosida</option>
-                    <option value="fixed">Aniq narx</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="label" htmlFor="vacancy-due-date">
-                    Muddat
-                  </label>
-                  <input
-                    id="vacancy-due-date"
-                    type="date"
-                    className="input"
-                    value={vacancyForm.dueDate}
-                    onChange={updateVacancyField('dueDate')}
-                  />
-                </div>
-              </div>
-
-              {vacancyForm.priceType === 'fixed' && (
-                <div>
-                  <label className="label" htmlFor="vacancy-price-amount">
-                    Narx (so`m)
-                  </label>
-                  <input
-                    id="vacancy-price-amount"
-                    type="number"
-                    className="input"
-                    min="1"
-                    value={vacancyForm.priceAmount}
-                    onChange={updateVacancyField('priceAmount')}
-                    required
-                  />
-                </div>
-              )}
-
-              <div className="modal-actions">
-                <button type="button" className="button button-ghost" onClick={closeVacancyModal}>
-                  Bekor qilish
-                </button>
-                <button className="button button-primary" type="submit" disabled={vacancyStatus.saving}>
-                  {vacancyStatus.saving ? 'Yaratilmoqda...' : 'Vakansiya yaratish'}
-                </button>
-              </div>
-            </form>
           </article>
         </div>
       )}

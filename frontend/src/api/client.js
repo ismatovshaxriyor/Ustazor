@@ -1,9 +1,15 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://127.0.0.1:8000';
+const ACCESS_KEY = 'ustazor_access';
+const REFRESH_KEY = 'ustazor_refresh';
+let authRedirectLocked = false;
 
 const FIELD_LABELS = {
   email: 'Email',
   phone_number: 'Telefon raqami',
+  secondary_phone_number: "Qo'shimcha telefon",
+  telegram_username: 'Telegram username',
+  instagram_username: 'Instagram username',
   full_name: 'To`liq ism',
   profile_photo: 'Profil rasmi',
   title: 'Sarlavha',
@@ -76,6 +82,29 @@ function toMessage(value) {
   return '';
 }
 
+function handleUnauthorizedAuth() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    localStorage.removeItem(ACCESS_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+  } catch {
+    // localStorage bo`lmagan holatlarni jim o'tkazamiz.
+  }
+
+  if (authRedirectLocked) {
+    return;
+  }
+  authRedirectLocked = true;
+
+  const currentPath = window.location.pathname || '';
+  if (!currentPath.startsWith('/auth/')) {
+    window.location.assign('/auth/login');
+  }
+}
+
 async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData;
   const headers = { ...(options.headers || {}) };
@@ -97,6 +126,12 @@ async function request(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    const hasAuthHeader = Boolean(headers.Authorization || headers.authorization);
+    if (response.status === 401 && hasAuthHeader) {
+      handleUnauthorizedAuth();
+      throw new Error('Sessiya tugadi. Qayta tizimga kiring.');
+    }
+
     const message = toMessage(data) || 'So`rov bajarilmadi.';
     throw new Error(message);
   }
@@ -105,6 +140,15 @@ async function request(path, options = {}) {
 }
 
 export const authApi = {
+  exchangeClerk(payload, clerkToken) {
+    return request('/api/auth/clerk/exchange/', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${clerkToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+  },
   login(credentials) {
     return request('/api/token/', {
       method: 'POST',
@@ -238,6 +282,15 @@ export const authApi = {
       body: JSON.stringify(payload),
     });
   },
+  updateOrder(id, payload, accessToken) {
+    return request(`/api/orders/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+  },
   closeOrder(id, accessToken) {
     return request(`/api/orders/${id}/close/`, {
       method: 'POST',
@@ -257,8 +310,15 @@ export const authApi = {
     const suffix = query.toString() ? `?${query.toString()}` : '';
     return request(`/api/workers/${suffix}`, { method: 'GET' });
   },
-  getPublicWorker(id) {
-    return request(`/api/workers/${id}/`, { method: 'GET' });
+  getPublicWorker(id, accessToken = null) {
+    const headers = {};
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+    return request(`/api/workers/${id}/`, {
+      method: 'GET',
+      headers,
+    });
   },
   listPublicVacancies(params = {}) {
     const query = new URLSearchParams();
@@ -329,6 +389,15 @@ export const authApi = {
       },
     });
   },
+  startChatThread(payload, accessToken) {
+    return request('/api/chat/threads/start/', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+  },
   listChatMessages(threadId, accessToken) {
     return request(`/api/chat/threads/${threadId}/messages/`, {
       method: 'GET',
@@ -338,12 +407,13 @@ export const authApi = {
     });
   },
   sendChatMessage(threadId, payload, accessToken) {
+    const body = payload instanceof FormData ? payload : JSON.stringify(payload);
     return request(`/api/chat/threads/${threadId}/messages/`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify(payload),
+      body,
     });
   },
   markChatRead(threadId, accessToken) {
@@ -355,22 +425,30 @@ export const authApi = {
       body: JSON.stringify({}),
     });
   },
-  acceptChatWorker(threadId, accessToken) {
+  acceptChatWorker(threadId, accessToken, proposalId = null) {
+    const payload = {};
+    if (proposalId) {
+      payload.proposal_id = proposalId;
+    }
     return request(`/api/chat/threads/${threadId}/accept-worker/`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify(payload),
     });
   },
-  rejectChatWorker(threadId, accessToken) {
+  rejectChatWorker(threadId, accessToken, proposalId = null) {
+    const payload = {};
+    if (proposalId) {
+      payload.proposal_id = proposalId;
+    }
     return request(`/api/chat/threads/${threadId}/reject-worker/`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify(payload),
     });
   },
   createOrderReview(orderId, payload, accessToken) {

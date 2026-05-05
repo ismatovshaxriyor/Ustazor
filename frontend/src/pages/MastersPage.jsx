@@ -1,15 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { SlidersHorizontal } from 'lucide-react';
 import { authApi } from '../api/client';
 import { normalizeListResponse } from '../utils/format';
 
 function MastersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [query, setQuery] = useState(() => searchParams.get('q') || '');
-  const [category, setCategory] = useState(() => searchParams.get('category') || '');
-  const [city, setCity] = useState(() => searchParams.get('city') || '');
-  const [minRating, setMinRating] = useState(() => searchParams.get('min_rating') || '');
-  const [sort, setSort] = useState(() => searchParams.get('sort') || 'rating_desc');
+  const initialQuery = searchParams.get('q') || '';
+  const initialFilters = {
+    category: searchParams.get('category') || '',
+    city: searchParams.get('city') || '',
+    minRating: searchParams.get('min_rating') || '',
+    minExperience: searchParams.get('min_experience') || '',
+    sort: searchParams.get('sort') || 'rating_desc',
+  };
+
+  const [queryInput, setQueryInput] = useState(initialQuery);
+  const [query, setQuery] = useState(initialQuery.trim());
+  const [filters, setFilters] = useState(initialFilters);
+  const [draftFilters, setDraftFilters] = useState(initialFilters);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [masters, setMasters] = useState([]);
   const [directory, setDirectory] = useState([]);
   const [status, setStatus] = useState({ loading: true, error: '' });
@@ -19,20 +29,24 @@ function MastersPage() {
     if (query.trim()) {
       params.set('q', query.trim());
     }
-    if (category.trim()) {
-      params.set('category', category.trim());
+    if (filters.category.trim()) {
+      params.set('category', filters.category.trim());
     }
-    if (city.trim()) {
-      params.set('city', city.trim());
+    if (filters.city.trim()) {
+      params.set('city', filters.city.trim());
     }
-    if (minRating.trim()) {
-      params.set('min_rating', minRating.trim());
+    if (filters.minRating.trim()) {
+      params.set('min_rating', filters.minRating.trim());
     }
-    if (sort && sort !== 'rating_desc') {
-      params.set('sort', sort);
+    if (filters.minExperience.trim()) {
+      params.set('min_experience', filters.minExperience.trim());
     }
+    if (filters.sort && filters.sort !== 'rating_desc') {
+      params.set('sort', filters.sort);
+    }
+
     setSearchParams(params, { replace: true });
-  }, [query, category, city, minRating, sort, setSearchParams]);
+  }, [query, filters, setSearchParams]);
 
   useEffect(() => {
     let active = true;
@@ -63,10 +77,11 @@ function MastersPage() {
     authApi
       .listPublicWorkers({
         q: query,
-        category,
-        city,
-        min_rating: minRating,
-        sort,
+        category: filters.category,
+        city: filters.city,
+        min_rating: filters.minRating,
+        min_experience: filters.minExperience,
+        sort: filters.sort,
       })
       .then((data) => {
         if (!active) {
@@ -89,23 +104,78 @@ function MastersPage() {
     return () => {
       active = false;
     };
-  }, [query, category, city, minRating, sort]);
+  }, [query, filters]);
 
   const categories = useMemo(() => {
     const values = new Set(directory.map((item) => item.specialization).filter(Boolean));
-    if (category.trim()) {
-      values.add(category.trim());
+    if (filters.category.trim()) {
+      values.add(filters.category.trim());
     }
     return ['all', ...Array.from(values)];
-  }, [directory, category]);
+  }, [directory, filters.category]);
 
   const cities = useMemo(() => {
     const values = new Set(directory.map((item) => item.service_city).filter(Boolean));
-    if (city.trim()) {
-      values.add(city.trim());
+    if (filters.city.trim()) {
+      values.add(filters.city.trim());
     }
     return ['all', ...Array.from(values)];
-  }, [directory, city]);
+  }, [directory, filters.city]);
+
+  const activeFilterCount = useMemo(
+    () => [
+      filters.category,
+      filters.city,
+      filters.minRating,
+      filters.minExperience,
+      filters.sort !== 'rating_desc' ? filters.sort : '',
+    ].filter(Boolean).length,
+    [filters],
+  );
+
+  const onSearchSubmit = (event) => {
+    event.preventDefault();
+    setQuery(queryInput.trim());
+  };
+
+  const openFilterModal = () => {
+    setDraftFilters(filters);
+    setIsFilterModalOpen(true);
+  };
+
+  const closeFilterModal = () => {
+    setIsFilterModalOpen(false);
+  };
+
+  const updateDraftFilter = (field) => (event) => {
+    const value = event.target.value;
+    setDraftFilters((prev) => ({
+      ...prev,
+      [field]: value === 'all' ? '' : value,
+    }));
+  };
+
+  const resetDraftFilters = () => {
+    setDraftFilters({
+      category: '',
+      city: '',
+      minRating: '',
+      minExperience: '',
+      sort: 'rating_desc',
+    });
+  };
+
+  const applyFilters = () => {
+    setQuery(queryInput.trim());
+    setFilters({
+      category: draftFilters.category,
+      city: draftFilters.city,
+      minRating: draftFilters.minRating,
+      minExperience: draftFilters.minExperience,
+      sort: draftFilters.sort || 'rating_desc',
+    });
+    setIsFilterModalOpen(false);
+  };
 
   return (
     <section className="stack-medium">
@@ -114,54 +184,23 @@ function MastersPage() {
         <h1>Ishingizga mos ustani toping</h1>
       </div>
 
-      <div className="filter-bar reveal-up delay-1">
-        <input
-          className="input"
-          placeholder="Usta yoki xizmat bo'yicha qidirish"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <select
-          className="input"
-          value={category || 'all'}
-          onChange={(event) => setCategory(event.target.value === 'all' ? '' : event.target.value)}
-        >
-          {categories.map((item) => (
-            <option key={item} value={item}>
-              {item === 'all' ? "Barcha yo'nalish" : item}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input"
-          value={city || 'all'}
-          onChange={(event) => setCity(event.target.value === 'all' ? '' : event.target.value)}
-        >
-          {cities.map((item) => (
-            <option key={item} value={item}>
-              {item === 'all' ? 'Barcha shahar' : item}
-            </option>
-          ))}
-        </select>
-        <select
-          className="input"
-          value={minRating || 'all'}
-          onChange={(event) => setMinRating(event.target.value === 'all' ? '' : event.target.value)}
-        >
-          <option value="all">Har qanday reyting</option>
-          <option value="4.5">4.5+ reyting</option>
-          <option value="4">4.0+ reyting</option>
-          <option value="3">3.0+ reyting</option>
-        </select>
-        <select
-          className="input"
-          value={sort}
-          onChange={(event) => setSort(event.target.value)}
-        >
-          <option value="rating_desc">Reyting: yuqoridan</option>
-          <option value="rating_asc">Reyting: pastdan</option>
-          <option value="newest">So`nggi yangilangan</option>
-        </select>
+      <div className="masters-toolbar reveal-up delay-1">
+        <form className="masters-search-form" onSubmit={onSearchSubmit}>
+          <input
+            className="input"
+            placeholder="Usta yoki xizmat bo'yicha qidirish"
+            value={queryInput}
+            onChange={(event) => setQueryInput(event.target.value)}
+          />
+          <button className="button button-primary" type="submit">
+            Qidirish
+          </button>
+        </form>
+        <button type="button" className="button button-ghost masters-filter-button" onClick={openFilterModal}>
+          <SlidersHorizontal size={18} />
+          <span>Filtr</span>
+          {activeFilterCount > 0 ? <span className="masters-filter-count">{activeFilterCount}</span> : null}
+        </button>
       </div>
 
       {status.loading ? (
@@ -204,6 +243,117 @@ function MastersPage() {
               </div>
             </article>
           ))}
+        </div>
+      )}
+
+      {isFilterModalOpen && (
+        <div className="modal-backdrop" onClick={closeFilterModal} role="presentation">
+          <article className="modal-card card masters-filter-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="section-row-head">
+              <h3>Ustalarni filtrlash</h3>
+              <button type="button" className="button button-ghost" onClick={closeFilterModal}>
+                Yopish
+              </button>
+            </div>
+
+            <div className="masters-filter-grid">
+              <div>
+                <label className="label" htmlFor="masters-filter-category">
+                  Yo'nalish
+                </label>
+                <select
+                  id="masters-filter-category"
+                  className="input"
+                  value={draftFilters.category || 'all'}
+                  onChange={updateDraftFilter('category')}
+                >
+                  {categories.map((item) => (
+                    <option key={item} value={item}>
+                      {item === 'all' ? "Barcha yo'nalish" : item}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label" htmlFor="masters-filter-city">
+                  Shahar
+                </label>
+                <select
+                  id="masters-filter-city"
+                  className="input"
+                  value={draftFilters.city || 'all'}
+                  onChange={updateDraftFilter('city')}
+                >
+                  {cities.map((item) => (
+                    <option key={item} value={item}>
+                      {item === 'all' ? 'Barcha shahar' : item}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label" htmlFor="masters-filter-rating">
+                  Reyting
+                </label>
+                <select
+                  id="masters-filter-rating"
+                  className="input"
+                  value={draftFilters.minRating || 'all'}
+                  onChange={updateDraftFilter('minRating')}
+                >
+                  <option value="all">Har qanday reyting</option>
+                  <option value="4.5">4.5+ reyting</option>
+                  <option value="4">4.0+ reyting</option>
+                  <option value="3">3.0+ reyting</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="label" htmlFor="masters-filter-experience">
+                  Tajriba
+                </label>
+                <select
+                  id="masters-filter-experience"
+                  className="input"
+                  value={draftFilters.minExperience || 'all'}
+                  onChange={updateDraftFilter('minExperience')}
+                >
+                  <option value="all">Har qanday tajriba</option>
+                  <option value="1">1+ yil</option>
+                  <option value="3">3+ yil</option>
+                  <option value="5">5+ yil</option>
+                  <option value="10">10+ yil</option>
+                </select>
+              </div>
+
+              <div className="masters-filter-grid-wide">
+                <label className="label" htmlFor="masters-filter-sort">
+                  Saralash
+                </label>
+                <select
+                  id="masters-filter-sort"
+                  className="input"
+                  value={draftFilters.sort}
+                  onChange={updateDraftFilter('sort')}
+                >
+                  <option value="rating_desc">Reyting: yuqoridan</option>
+                  <option value="rating_asc">Reyting: pastdan</option>
+                  <option value="newest">So`nggi yangilangan</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="button button-ghost" onClick={resetDraftFilters}>
+                Filtrlarni tozalash
+              </button>
+              <button type="button" className="button button-primary" onClick={applyFilters}>
+                Qidirish
+              </button>
+            </div>
+          </article>
         </div>
       )}
 

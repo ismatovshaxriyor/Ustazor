@@ -10,7 +10,6 @@ class ChatThreadAdmin(admin.ModelAdmin):
         'vacancy',
         'client',
         'worker',
-        'proposal',
         'updated_at',
     )
     search_fields = (
@@ -20,7 +19,7 @@ class ChatThreadAdmin(admin.ModelAdmin):
         'worker__full_name',
         'worker__email',
     )
-    autocomplete_fields = ('proposal', 'vacancy', 'client', 'worker')
+    autocomplete_fields = ('vacancy', 'client', 'worker')
 
 
 @admin.register(ChatMessage)

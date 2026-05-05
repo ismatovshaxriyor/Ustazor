@@ -11,6 +11,7 @@ function VacancyDetailPage() {
   const [vacancy, setVacancy] = useState(null);
   const [status, setStatus] = useState({ loading: true, error: '' });
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+  const [showContactDetails, setShowContactDetails] = useState(false);
   const [alreadyApplied, setAlreadyApplied] = useState(false);
   const [existingProposal, setExistingProposal] = useState(null);
   const [applyForm, setApplyForm] = useState({
@@ -25,6 +26,7 @@ function VacancyDetailPage() {
     let active = true;
     setStatus({ loading: true, error: '' });
     setAlreadyApplied(false);
+    setShowContactDetails(false);
     setExistingProposal(null);
     setApplyStatus({ saving: false, error: '', success: '' });
 
@@ -127,6 +129,55 @@ function VacancyDetailPage() {
     );
   }
 
+  const clientPhone = `${vacancy.client_phone_number || ''}`.trim();
+  const clientSecondaryPhone = `${vacancy.client_secondary_phone_number || ''}`.trim();
+  const clientEmail = `${vacancy.client_email || ''}`.trim();
+  const rawTelegram = `${vacancy.client_telegram_username || ''}`.trim();
+  const cleanTelegram = rawTelegram.startsWith('@') ? rawTelegram.slice(1) : rawTelegram;
+  const telegramUrl = cleanTelegram ? `https://t.me/${encodeURIComponent(cleanTelegram)}` : '';
+  const rawInstagram = `${vacancy.client_instagram_username || ''}`.trim();
+  const cleanInstagram = rawInstagram.startsWith('@') ? rawInstagram.slice(1) : rawInstagram;
+  const instagramUrl = cleanInstagram
+    ? `https://instagram.com/${encodeURIComponent(cleanInstagram)}`
+    : '';
+  const contactItems = [
+    {
+      key: 'phone',
+      label: 'Telefon raqami',
+      value: clientPhone,
+      text: clientPhone,
+      href: clientPhone ? `tel:${clientPhone}` : '',
+    },
+    {
+      key: 'secondary_phone',
+      label: "Qo`shimcha telefon",
+      value: clientSecondaryPhone,
+      text: clientSecondaryPhone,
+      href: clientSecondaryPhone ? `tel:${clientSecondaryPhone}` : '',
+    },
+    {
+      key: 'telegram',
+      label: 'Telegram',
+      value: cleanTelegram,
+      text: `@${cleanTelegram}`,
+      href: telegramUrl,
+    },
+    {
+      key: 'instagram',
+      label: 'Instagram',
+      value: cleanInstagram,
+      text: `@${cleanInstagram}`,
+      href: instagramUrl,
+    },
+    {
+      key: 'email',
+      label: 'Email',
+      value: clientEmail,
+      text: clientEmail,
+      href: clientEmail ? `mailto:${clientEmail}` : '',
+    },
+  ].filter((item) => item.value);
+
   return (
     <section className="profile-layout reveal-up">
       <article className="profile-main card">
@@ -177,9 +228,39 @@ function VacancyDetailPage() {
             Kirib murojaat qiling
           </Link>
         )}
-        <Link to="/chat" className="button button-ghost full-width">
-          Mijoz bilan chat
-        </Link>
+        <button
+          type="button"
+          className="button button-ghost full-width"
+          onClick={() => setShowContactDetails((prev) => !prev)}
+        >
+          {showContactDetails ? "Bog'lanishni yopish" : "Bog'lanish"}
+        </button>
+        {showContactDetails && (
+          contactItems.length > 0 ? (
+            <div className="chat-vacancy-grid">
+              {contactItems.map((item) => (
+                <div key={item.key} className="chat-vacancy-item">
+                  <p className="chat-vacancy-item-label">{item.label}</p>
+                  <p className="chat-vacancy-item-value">
+                    {item.href ? (
+                      <a
+                        href={item.href}
+                        target={item.href.startsWith('http') ? '_blank' : undefined}
+                        rel={item.href.startsWith('http') ? 'noreferrer' : undefined}
+                      >
+                        {item.text}
+                      </a>
+                    ) : (
+                      item.text
+                    )}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">Bog`lanish ma`lumotlari kiritilmagan.</p>
+          )
+        )}
         {applyStatus.error && <p className="form-message error">{applyStatus.error}</p>}
         {applyStatus.success && <p className="form-message success">{applyStatus.success}</p>}
       </aside>

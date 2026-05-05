@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives
 from django.db import IntegrityError
@@ -25,7 +26,47 @@ from apps.accounts.services.activation import (
 User = get_user_model()
 
 
-DEFAULT_PROFILE_FILENAMES = {'default_client.png', 'default_worker.png'}
+DEFAULT_PROFILE_FILENAMES = {'default_client.png', 'default_worker.png', 'default_user.png'}
+
+
+def _normalize_phone(value: str) -> str:
+    raw = (value or '').strip()
+    if not raw:
+        raise serializers.ValidationError("Telefon raqami bo`sh bo`lishi mumkin emas.")
+
+    has_plus = raw.startswith('+')
+    digits = ''.join(ch for ch in raw if ch.isdigit())
+    if not digits:
+        raise serializers.ValidationError("Telefon raqami noto`g`ri formatda.")
+
+    normalized = f"+{digits}" if has_plus else digits
+    if len(digits) < 9:
+        raise serializers.ValidationError("Telefon raqami kamida 9 ta raqamdan iborat bo`lishi kerak.")
+    if len(normalized) > 15:
+        raise serializers.ValidationError("Telefon raqami juda uzun.")
+    return normalized
+
+
+def _normalize_social_username(value: str | None, *, platform_label: str) -> str:
+    if value is None:
+        return ''
+
+    clean = value.strip()
+    if not clean:
+        return ''
+
+    if clean.startswith('@'):
+        clean = clean[1:]
+
+    allowed = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.')
+    if any(ch not in allowed for ch in clean):
+        raise serializers.ValidationError(
+            f"{platform_label} username faqat harf, raqam, '_' va '.' belgilaridan iborat bo`lishi kerak."
+        )
+    if len(clean) < 3:
+        raise serializers.ValidationError(f"{platform_label} username kamida 3 belgidan iborat bo`lishi kerak.")
+
+    return clean
 
 
 def _profile_photo_filename(user) -> str:
@@ -123,6 +164,9 @@ class UserSerializer(serializers.ModelSerializer):
             'id',
             'email',
             'phone_number',
+            'secondary_phone_number',
+            'telegram_username',
+            'instagram_username',
             'full_name',
             'profile_photo_url',
             'user_type',
@@ -138,6 +182,7 @@ class UserSerializer(serializers.ModelSerializer):
 class MeProfileSerializer(serializers.ModelSerializer):
     profile_photo_url = serializers.SerializerMethodField(read_only=True)
     profile_photo = serializers.ImageField(required=False, allow_null=True)
+    remove_profile_photo = serializers.BooleanField(required=False, default=False, write_only=True)
 
     class Meta:
         model = User
@@ -145,27 +190,73 @@ class MeProfileSerializer(serializers.ModelSerializer):
             'id',
             'email',
             'phone_number',
+            'secondary_phone_number',
+            'telegram_username',
+            'instagram_username',
             'full_name',
             'user_type',
             'profile_photo',
+            'remove_profile_photo',
             'profile_photo_url',
             'is_verified',
             'date_joined',
         )
-        read_only_fields = ('id', 'email', 'user_type', 'profile_photo_url', 'is_verified', 'date_joined')
+        read_only_fields = ('id', 'email', 'profile_photo_url', 'is_verified', 'date_joined')
 
     def validate_phone_number(self, value):
+        normalized = _normalize_phone(value)
         user = self.instance
-        qs = User.objects.filter(phone_number=value)
+        qs = User.objects.filter(phone_number=normalized)
         if user is not None:
             qs = qs.exclude(pk=user.pk)
 
         if qs.exists():
             raise serializers.ValidationError('Bu telefon raqami allaqachon ro\'yxatdan o\'tgan.')
+        return normalized
+
+    def validate_secondary_phone_number(self, value):
+        if value in (None, ''):
+            return ''
+        return _normalize_phone(value)
+
+    def validate_user_type(self, value):
+        valid_user_types = {choice[0] for choice in USER_TYPE_CHOICES.choices}
+        if value not in valid_user_types:
+            raise serializers.ValidationError("Noto'g'ri user_type yuborildi.")
         return value
 
     def get_profile_photo_url(self, obj) -> str:
         return _profile_photo_url(obj, self.context.get('request'))
+
+    def validate_telegram_username(self, value):
+        return _normalize_social_username(value, platform_label='Telegram')
+
+    def validate_instagram_username(self, value):
+        return _normalize_social_username(value, platform_label='Instagram')
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        phone_number = attrs.get('phone_number', getattr(self.instance, 'phone_number', ''))
+        secondary_phone = attrs.get(
+            'secondary_phone_number',
+            getattr(self.instance, 'secondary_phone_number', ''),
+        )
+        if secondary_phone and phone_number and secondary_phone == phone_number:
+            raise serializers.ValidationError(
+                {'secondary_phone_number': "Qo`shimcha raqam asosiy telefon raqamidan farq qilishi kerak."}
+            )
+        return attrs
+
+    def update(self, instance, validated_data):
+        remove_profile_photo = bool(validated_data.pop('remove_profile_photo', False))
+        if remove_profile_photo and instance.profile_photo:
+            current_name = _profile_photo_filename(instance)
+            current_file = instance.profile_photo
+            instance.profile_photo = None
+            if current_name and current_name not in DEFAULT_PROFILE_FILENAMES:
+                current_file.delete(save=False)
+
+        return super().update(instance, validated_data)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -289,9 +380,13 @@ class WorkerPublicListSerializer(serializers.ModelSerializer):
 
 
 class WorkerPublicDetailSerializer(serializers.ModelSerializer):
+    worker_user_id = serializers.IntegerField(source='user.id', read_only=True)
     full_name = serializers.CharField(source='user.full_name', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
     phone_number = serializers.CharField(source='user.phone_number', read_only=True)
+    secondary_phone_number = serializers.CharField(source='user.secondary_phone_number', read_only=True)
+    telegram_username = serializers.CharField(source='user.telegram_username', read_only=True)
+    instagram_username = serializers.CharField(source='user.instagram_username', read_only=True)
     profile_photo_url = serializers.SerializerMethodField()
     skills = serializers.SerializerMethodField()
     rating_avg = serializers.FloatField(read_only=True)
@@ -303,9 +398,13 @@ class WorkerPublicDetailSerializer(serializers.ModelSerializer):
         model = WorkerProfile
         fields = (
             'id',
+            'worker_user_id',
             'full_name',
             'email',
             'phone_number',
+            'secondary_phone_number',
+            'telegram_username',
+            'instagram_username',
             'profile_photo_url',
             'specialization',
             'experience_years',
@@ -357,6 +456,11 @@ class WorkerPublicDetailSerializer(serializers.ModelSerializer):
 
 
 class WorkerDashboardSerializer(serializers.Serializer):
+    class RecentProfileViewerSerializer(serializers.Serializer):
+        viewer_id = serializers.IntegerField()
+        viewer_name = serializers.CharField()
+        viewed_at = serializers.DateTimeField()
+
     profile = WorkerProfileSerializer()
     skills_count = serializers.IntegerField()
     active_skills_count = serializers.IntegerField()
@@ -364,6 +468,8 @@ class WorkerDashboardSerializer(serializers.Serializer):
     in_progress_orders_count = serializers.IntegerField()
     completed_orders_count = serializers.IntegerField()
     profile_completion_percent = serializers.IntegerField()
+    profile_views_count = serializers.IntegerField()
+    recent_profile_viewers = RecentProfileViewerSerializer(many=True)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -376,6 +482,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = (
             'email',
             'phone_number',
+            'secondary_phone_number',
+            'telegram_username',
+            'instagram_username',
             'full_name',
             'user_type',
             'password',
@@ -391,15 +500,39 @@ class RegisterSerializer(serializers.ModelSerializer):
         return email
 
     def validate_phone_number(self, value):
-        if User.objects.filter(phone_number=value).exists():
+        normalized = _normalize_phone(value)
+        if User.objects.filter(phone_number=normalized).exists():
             raise serializers.ValidationError('Bu telefon raqami allaqachon ro\'yxatdan o\'tgan.')
-        return value
+        return normalized
+
+    def validate_secondary_phone_number(self, value):
+        if value in (None, ''):
+            return ''
+        return _normalize_phone(value)
 
     def validate_user_type(self, value):
         valid_user_types = {choice[0] for choice in USER_TYPE_CHOICES.choices}
         if value not in valid_user_types:
             raise serializers.ValidationError("Noto'g'ri user_type yuborildi.")
         return value
+
+    def validate_telegram_username(self, value):
+        return _normalize_social_username(value, platform_label='Telegram')
+
+    def validate_instagram_username(self, value):
+        return _normalize_social_username(value, platform_label='Instagram')
+
+    def validate_password(self, value):
+        validate_password(value)
+        return value
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if attrs.get('secondary_phone_number') and attrs.get('secondary_phone_number') == attrs.get('phone_number'):
+            raise serializers.ValidationError(
+                {'secondary_phone_number': "Qo`shimcha raqam asosiy telefon raqamidan farq qilishi kerak."}
+            )
+        return attrs
 
     def create(self, validated_data):
         password = validated_data.pop('password')
@@ -508,6 +641,14 @@ class ResendActivationSerializer(serializers.Serializer):
         user = self.validated_data['user']
         _issue_and_send_activation_code(user)
         return user
+
+
+class ClerkExchangeSerializer(serializers.Serializer):
+    clerk_user_id = serializers.CharField(required=False, allow_blank=True, max_length=128)
+    email = serializers.EmailField()
+    full_name = serializers.CharField(required=False, allow_blank=True, max_length=120)
+    phone_number = serializers.CharField(required=False, allow_blank=True, max_length=20)
+    user_type = serializers.ChoiceField(choices=USER_TYPE_CHOICES.choices, required=False)
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):

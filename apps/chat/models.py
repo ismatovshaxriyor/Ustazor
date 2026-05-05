@@ -3,7 +3,6 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 
 from apps.jobs.models import JobOrder
-from apps.proposals.models import VacancyProposal
 
 
 class CHAT_MESSAGE_VISIBILITY_CHOICES(models.TextChoices):
@@ -13,15 +12,12 @@ class CHAT_MESSAGE_VISIBILITY_CHOICES(models.TextChoices):
 
 
 class ChatThread(models.Model):
-    proposal = models.OneToOneField(
-        VacancyProposal,
-        on_delete=models.CASCADE,
-        related_name='chat_thread',
-    )
     vacancy = models.ForeignKey(
         JobOrder,
         on_delete=models.CASCADE,
         related_name='chat_threads',
+        null=True,
+        blank=True,
     )
     client = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -40,6 +36,12 @@ class ChatThread(models.Model):
         ordering = ('-updated_at', '-created_at')
         verbose_name = 'Chat suhbati'
         verbose_name_plural = 'Chat suhbatlari'
+        constraints = [
+            models.UniqueConstraint(
+                fields=('client', 'worker', 'vacancy'),
+                name='unique_client_worker_vacancy_chat_thread',
+            )
+        ]
 
     def __str__(self):
         return f'ChatThread<{self.id}>'
@@ -61,6 +63,7 @@ class ChatMessage(models.Model):
         related_name='chat_messages',
     )
     body = models.TextField()
+    attachment = models.FileField(upload_to='chat/messages/%Y/%m/%d/', blank=True, null=True)
     is_system = models.BooleanField(default=False)
     visibility = models.CharField(
         max_length=20,

@@ -2,6 +2,7 @@ import os
 import importlib.util
 from pathlib import Path
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 from config.drf_spectacular import *
 from config.jazzmin import *
@@ -26,18 +27,41 @@ def env_int(key: str, default: int) -> int:
         return default
 
 
-SECRET_KEY = os.environ.get("SECRET_KEY")
+def env_bool(key: str, default: bool) -> bool:
+    value = os.environ.get(key)
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
-DEBUG = os.environ.get("DEBUG", "True").lower() == "true"
 
-ALLOWED_HOSTS = [host.strip() for host in os.environ.get("ALLOWED_HOSTS", "*").split(",") if host.strip()]
+def env_list(key: str, default: str) -> list[str]:
+    raw_value = os.environ.get(key, default)
+    return [item.strip().rstrip("/") for item in raw_value.split(",") if item.strip()]
 
-CORS_ALLOW_ALL_ORIGINS = os.environ.get("CORS_ALLOW_ALL_ORIGINS", "True").lower() == "true"
+
+DEBUG = env_bool("DEBUG", True)
+
+SECRET_KEY = os.environ.get("SECRET_KEY", "").strip()
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "django-insecure-ustazor-dev-only-secret-key"
+    else:
+        raise ImproperlyConfigured("SECRET_KEY o`rnatilishi shart.")
+
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "127.0.0.1,localhost")
+
+CORS_ALLOW_ALL_ORIGINS = env_bool("CORS_ALLOW_ALL_ORIGINS", DEBUG)
 
 CORS_ALLOWED_ORIGINS = [
-    origin.strip().rstrip("/")
-    for origin in os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",")
-    if origin.strip()
+    origin
+    for origin in env_list("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+    if origin.startswith("http://") or origin.startswith("https://")
+]
+CORS_ALLOW_CREDENTIALS = env_bool("CORS_ALLOW_CREDENTIALS", True)
+CSRF_TRUSTED_ORIGINS = [
+    origin
+    for origin in env_list("CSRF_TRUSTED_ORIGINS", ",".join(CORS_ALLOWED_ORIGINS))
+    if origin.startswith("http://") or origin.startswith("https://")
 ]
 
 EMAIL_BACKEND = os.environ.get(
@@ -76,6 +100,23 @@ ACTIVATION_RESEND_COOLDOWN_SECONDS = env_int("ACTIVATION_RESEND_COOLDOWN_SECONDS
 ACTIVATION_MAX_ATTEMPTS = env_int("ACTIVATION_MAX_ATTEMPTS", 5)
 
 AUTH_USER_MODEL = 'accounts.CustomUser'
+
+SECURE_PROXY_SSL_HEADER = None
+if env_bool("USE_SECURE_PROXY_SSL_HEADER", False):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+USE_X_FORWARDED_HOST = env_bool("USE_X_FORWARDED_HOST", False)
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False if DEBUG else True)
+SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", not DEBUG)
+CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", not DEBUG)
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = env_bool("CSRF_COOKIE_HTTPONLY", False)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+SECURE_REFERRER_POLICY = os.environ.get("SECURE_REFERRER_POLICY", "strict-origin-when-cross-origin")
+SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 0 if DEBUG else 31536000)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", not DEBUG)
+SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", False)
 
 MY_APPS = [
     'apps.accounts',

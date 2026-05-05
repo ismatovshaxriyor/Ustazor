@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { resolveMediaUrl } from '../utils/media';
@@ -30,24 +30,55 @@ function WorkerProfilePage() {
     fetchMe,
     fetchWorkerProfile,
     fetchWorkerSkills,
+    fetchWorkerDashboard,
     createWorkerSkill,
     updateWorkerSkill,
     deleteWorkerSkill,
+    fetchWorkerReviews,
     fetchMyPortfolio,
     createPortfolio,
     deletePortfolio,
   } = useAuth();
   const [account, setAccount] = useState(null);
   const [workerProfile, setWorkerProfile] = useState(null);
+  const [workerStats, setWorkerStats] = useState(null);
   const [konikmalar, setKonikmalar] = useState([]);
   const [status, setStatus] = useState({ loading: true, error: '' });
   const [isKonikmaModalOpen, setIsKonikmaModalOpen] = useState(false);
   const [konikmaForm, setKonikmaForm] = useState(konikmaInitialForm);
   const [konikmaStatus, setKonikmaStatus] = useState({ saving: false, error: '', success: '' });
   const [portfolioItems, setPortfolioItems] = useState([]);
+  const [workerReviews, setWorkerReviews] = useState([]);
   const [isPortfolioModalOpen, setIsPortfolioModalOpen] = useState(false);
   const [portfolioForm, setPortfolioForm] = useState(portfolioInitialForm);
   const [portfolioStatus, setPortfolioStatus] = useState({ saving: false, error: '', success: '' });
+  const [activeSection, setActiveSection] = useState('overview');
+
+  const refreshWorkerStats = useCallback(async () => {
+    try {
+      const latestStats = await fetchWorkerDashboard();
+      setWorkerStats(latestStats);
+    } catch {
+      // Statistikani fon rejimida yangilashda xato bo`lsa, sahifani to`xtatmaymiz.
+    }
+  }, [fetchWorkerDashboard]);
+
+  const clearKonikmaFeedback = useCallback(() => {
+    setKonikmaStatus((prev) => ({ ...prev, error: '', success: '' }));
+  }, []);
+
+  const clearPortfolioFeedback = useCallback(() => {
+    setPortfolioStatus((prev) => ({ ...prev, error: '', success: '' }));
+  }, []);
+
+  const onSectionChange = (section) => {
+    setActiveSection(section);
+    clearKonikmaFeedback();
+    clearPortfolioFeedback();
+    if (section === 'stats') {
+      refreshWorkerStats();
+    }
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -56,15 +87,21 @@ function WorkerProfilePage() {
 
     let active = true;
 
-    Promise.all([fetchMe(), fetchWorkerProfile(), fetchWorkerSkills(), fetchMyPortfolio()])
-      .then(([me, worker, skillsData, portfolioData]) => {
+    Promise.all([fetchMe(), fetchWorkerProfile(), fetchWorkerSkills(), fetchMyPortfolio(), fetchWorkerDashboard()])
+      .then(async ([me, worker, skillsData, portfolioData, dashboardData]) => {
+        if (!active) {
+          return;
+        }
+        const reviewsData = await fetchWorkerReviews(me.id).catch(() => []);
         if (!active) {
           return;
         }
         setAccount(me);
         setWorkerProfile(worker);
+        setWorkerStats(dashboardData);
         setKonikmalar(Array.isArray(skillsData) ? skillsData : (skillsData.results || []));
         setPortfolioItems(Array.isArray(portfolioData) ? portfolioData : (portfolioData.results || []));
+        setWorkerReviews(Array.isArray(reviewsData) ? reviewsData : (reviewsData.results || []));
         setStatus({ loading: false, error: '' });
       })
       .catch((error) => {
@@ -80,7 +117,35 @@ function WorkerProfilePage() {
     return () => {
       active = false;
     };
-  }, [isAuthenticated, fetchMe, fetchWorkerProfile, fetchWorkerSkills, fetchMyPortfolio]);
+  }, [
+    isAuthenticated,
+    fetchMe,
+    fetchWorkerProfile,
+    fetchWorkerSkills,
+    fetchMyPortfolio,
+    fetchWorkerDashboard,
+    fetchWorkerReviews,
+  ]);
+
+  useEffect(() => {
+    if (!konikmaStatus.error && !konikmaStatus.success) {
+      return undefined;
+    }
+    const timerId = window.setTimeout(() => {
+      clearKonikmaFeedback();
+    }, 3500);
+    return () => window.clearTimeout(timerId);
+  }, [konikmaStatus.error, konikmaStatus.success, clearKonikmaFeedback]);
+
+  useEffect(() => {
+    if (!portfolioStatus.error && !portfolioStatus.success) {
+      return undefined;
+    }
+    const timerId = window.setTimeout(() => {
+      clearPortfolioFeedback();
+    }, 3500);
+    return () => window.clearTimeout(timerId);
+  }, [portfolioStatus.error, portfolioStatus.success, clearPortfolioFeedback]);
 
   const updateKonikmaField = (field) => (event) => {
     const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
@@ -124,9 +189,20 @@ function WorkerProfilePage() {
         is_active: Boolean(konikmaForm.isActive),
       });
       setKonikmalar((prev) => [created, ...prev]);
+      setWorkerStats((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        return {
+          ...prev,
+          skills_count: (prev.skills_count || 0) + 1,
+          active_skills_count: (prev.active_skills_count || 0) + (created.is_active ? 1 : 0),
+        };
+      });
       setKonikmaStatus({ saving: false, error: '', success: 'Xizmat qo`shildi.' });
       setKonikmaForm(konikmaInitialForm);
       setIsKonikmaModalOpen(false);
+      refreshWorkerStats();
     } catch (error) {
       setKonikmaStatus({
         saving: false,
@@ -140,7 +216,22 @@ function WorkerProfilePage() {
     try {
       const updated = await updateWorkerSkill(konikma.id, { is_active: !konikma.is_active });
       setKonikmalar((prev) => prev.map((item) => (item.id === konikma.id ? updated : item)));
+      setWorkerStats((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const becameActive = !konikma.is_active && updated.is_active;
+        const becameInactive = konikma.is_active && !updated.is_active;
+        return {
+          ...prev,
+          active_skills_count: Math.max(
+            0,
+            (prev.active_skills_count || 0) + (becameActive ? 1 : 0) - (becameInactive ? 1 : 0),
+          ),
+        };
+      });
       setKonikmaStatus({ saving: false, error: '', success: "Xizmat holati yangilandi." });
+      refreshWorkerStats();
     } catch (error) {
       setKonikmaStatus({
         saving: false,
@@ -156,10 +247,26 @@ function WorkerProfilePage() {
       return;
     }
 
+    const removedKonikma = konikmalar.find((item) => item.id === konikmaId) || null;
+
     try {
       await deleteWorkerSkill(konikmaId);
       setKonikmalar((prev) => prev.filter((item) => item.id !== konikmaId));
+      setWorkerStats((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        return {
+          ...prev,
+          skills_count: Math.max(0, (prev.skills_count || 0) - 1),
+          active_skills_count: Math.max(
+            0,
+            (prev.active_skills_count || 0) - (removedKonikma?.is_active ? 1 : 0),
+          ),
+        };
+      });
       setKonikmaStatus({ saving: false, error: '', success: "Xizmat o`chirildi." });
+      refreshWorkerStats();
     } catch (error) {
       setKonikmaStatus({
         saving: false,
@@ -257,165 +364,308 @@ function WorkerProfilePage() {
     );
   }
 
+  const activeSkillsCount = konikmalar.filter((item) => item.is_active).length;
+
   return (
     <section className="profile-shell reveal-up">
-      <article className="profile-view-card card">
-        <div className="profile-view-top">
-          <div className="profile-avatar-wrap">
-            <img
-              src={resolveMediaUrl(account?.profile_photo_url, { userType: 'worker' })}
-              alt="Profil rasmi"
-              className="profile-avatar"
-            />
-          </div>
-          <div className="profile-view-meta">
-            <h2>{account?.full_name || 'Usta'}</h2>
-            <p className="muted">{account?.email}</p>
-            <p className="muted">{account?.phone_number}</p>
-          </div>
-          <Link to="/profile/edit" className="button button-primary">
-            Profilni tahrirlash
-          </Link>
-        </div>
-
-        <div className="profile-badges">
-          <span className={`profile-badge${account?.is_verified ? ' badge-ok' : ''}`}>
-            {account?.is_verified ? 'Email tasdiqlangan' : 'Email tasdiqlanmagan'}
-          </span>
-          <span className={`profile-badge${workerProfile?.is_available ? ' badge-ok' : ''}`}>
-            {workerProfile?.is_available ? 'Hozir buyurtma oladi' : 'Hozir band'}
-          </span>
-          <span className="profile-badge">
-            Tajriba: {workerProfile?.experience_years || 0} yil
-          </span>
-        </div>
-
-        <div className="worker-meta-grid">
-          <article className="worker-meta-card">
-            <p className="worker-meta-label">Mutaxassislik</p>
-            <p className="worker-meta-value">{workerProfile?.specialization || 'Kiritilmagan'}</p>
-          </article>
-          <article className="worker-meta-card">
-            <p className="worker-meta-label">Xizmat hududi</p>
-            <p className="worker-meta-value">{workerProfile?.service_city || 'Kiritilmagan'}</p>
-          </article>
-        </div>
-
-        <article className="worker-about-card">
-          <p className="worker-meta-label">O`zim haqimda</p>
-          <p>{workerProfile?.about || 'Hozircha ma`lumot qo`shilmagan.'}</p>
-        </article>
-
-        <div className="worker-skills-section">
-          <div className="section-row-head">
-            <h3>Xizmatlar</h3>
-            <button type="button" className="button button-ghost" onClick={openKonikmaModal}>
-              Xizmat qo`shish
+      <div className="worker-profile-layout">
+        <aside className="profile-sidebar card">
+          <p className="worker-meta-label">Bo`limlar</p>
+          <div className="profile-nav-list">
+            <button
+              type="button"
+              className={`profile-nav-btn${activeSection === 'overview' ? ' active' : ''}`}
+              onClick={() => onSectionChange('overview')}
+            >
+              Asosiy ma`lumot
+            </button>
+            <button
+              type="button"
+              className={`profile-nav-btn${activeSection === 'stats' ? ' active' : ''}`}
+              onClick={() => onSectionChange('stats')}
+            >
+              <span>Statistika</span>
+              <span className="profile-nav-count">{workerStats?.profile_views_count || 0}</span>
+            </button>
+            <button
+              type="button"
+              className={`profile-nav-btn${activeSection === 'skills' ? ' active' : ''}`}
+              onClick={() => onSectionChange('skills')}
+            >
+              <span>Xizmatlar</span>
+              <span className="profile-nav-count">{konikmalar.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`profile-nav-btn${activeSection === 'portfolio' ? ' active' : ''}`}
+              onClick={() => onSectionChange('portfolio')}
+            >
+              <span>Ish namunalari</span>
+              <span className="profile-nav-count">{portfolioItems.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`profile-nav-btn${activeSection === 'reviews' ? ' active' : ''}`}
+              onClick={() => onSectionChange('reviews')}
+            >
+              <span>Reviewlar</span>
+              <span className="profile-nav-count">{workerReviews.length}</span>
             </button>
           </div>
-          {!isKonikmaModalOpen && konikmaStatus.error && (
-            <p className="form-message error">{konikmaStatus.error}</p>
-          )}
-          {!isKonikmaModalOpen && konikmaStatus.success && (
-            <p className="form-message success">{konikmaStatus.success}</p>
-          )}
+        </aside>
 
-          {konikmalar.length === 0 ? (
-            <p className="muted">Hozircha xizmat qo`shilmagan.</p>
-          ) : (
-            <div className="worker-skill-grid">
-              {konikmalar.map((konikma) => (
-                <article key={konikma.id} className="worker-skill-card">
-                  <div className="worker-skill-head">
-                    <h4>{konikma.title}</h4>
-                    <span className={`status-pill ${konikma.is_active ? 'status-completed' : 'status-cancelled'}`}>
-                      {konikma.is_active ? 'Faol' : 'Nofaol'}
-                    </span>
-                  </div>
-                  <p>{konikma.description || 'Izoh kiritilmagan'}</p>
-                  <p className="muted">Narx: {formatKonikmaPrice(konikma)}</p>
-                  <p className="muted">Tajriba: {konikma.experience_years || 0} yil</p>
-                  {konikma.extra_info && <p className="muted">Qo`shimcha: {konikma.extra_info}</p>}
-                  <div className="skill-card-actions">
-                    <button
-                      type="button"
-                      className="button button-ghost"
-                      onClick={() => onToggleKonikma(konikma)}
-                    >
-                      {konikma.is_active ? 'Nofaol qilish' : 'Faol qilish'}
-                    </button>
-                    <button
-                      type="button"
-                      className="button button-ghost danger-button"
-                      onClick={() => onDeleteKonikma(konikma.id)}
-                    >
-                      O`chirish
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="worker-skills-section">
-          <div className="section-row-head">
-            <h3>Ish namunalarim</h3>
-            <button type="button" className="button button-ghost" onClick={openPortfolioModal}>
-              Ish qo`shish
-            </button>
-          </div>
-          {!isPortfolioModalOpen && portfolioStatus.error && (
-            <p className="form-message error">{portfolioStatus.error}</p>
-          )}
-          {!isPortfolioModalOpen && portfolioStatus.success && (
-            <p className="form-message success">{portfolioStatus.success}</p>
-          )}
-
-          {portfolioItems.length === 0 ? (
-            <p className="muted">Hozircha ish namunalari yo`q.</p>
-          ) : (
-            <div className="worker-skill-grid">
-              {portfolioItems.map((item) => (
-                <article key={item.id} className="worker-skill-card">
-                  <div className="worker-skill-head">
-                    <h4>{item.title}</h4>
-                    {item.completed_at ? (
-                      <span className="status-pill status-open">{formatDate(item.completed_at)}</span>
-                    ) : null}
-                  </div>
-                  <p>{item.description || 'Tavsif kiritilmagan.'}</p>
-                  {item.location ? <p className="muted">Hudud: {item.location}</p> : null}
-                  {Array.isArray(item.images) && item.images.length > 0 ? (
-                    <div className="portfolio-image-row">
-                      {item.images.map((image) => (
-                        <img
-                          key={image.id}
-                          src={resolveMediaUrl(image.image_url)}
-                          alt={item.title}
-                          className="portfolio-image-thumb"
-                          loading="lazy"
-                        />
-                      ))}
-                    </div>
+        <article className="worker-profile-content card">
+          {activeSection === 'overview' && (
+            <>
+              <div className="profile-view-top">
+                <div className="profile-avatar-wrap">
+                  <img
+                    src={resolveMediaUrl(account?.profile_photo_url, { userType: 'worker' })}
+                    alt="Profil rasmi"
+                    className="profile-avatar"
+                  />
+                </div>
+                <div className="profile-view-meta">
+                  <h2>{account?.full_name || 'Usta'}</h2>
+                  <p className="muted">{account?.email}</p>
+                  <p className="muted">{account?.phone_number}</p>
+                  {account?.secondary_phone_number ? (
+                    <p className="muted">{`Qo'shimcha: ${account.secondary_phone_number}`}</p>
                   ) : null}
-                  <div className="skill-card-actions">
-                    <button
-                      type="button"
-                      className="button button-ghost danger-button"
-                      onClick={() => onDeletePortfolio(item.id)}
-                    >
-                      O`chirish
-                    </button>
-                  </div>
+                  {account?.telegram_username ? (
+                    <p className="muted">@{account.telegram_username}</p>
+                  ) : null}
+                  {account?.instagram_username ? (
+                    <p className="muted">{`Instagram: @${account.instagram_username}`}</p>
+                  ) : null}
+                </div>
+                <Link to="/profile/edit" className="button button-primary">
+                  Profilni tahrirlash
+                </Link>
+              </div>
+
+              <div className="profile-badges">
+                <span className={`profile-badge${account?.is_verified ? ' badge-ok' : ''}`}>
+                  {account?.is_verified ? 'Email tasdiqlangan' : 'Email tasdiqlanmagan'}
+                </span>
+                <span className={`profile-badge${workerProfile?.is_available ? ' badge-ok' : ''}`}>
+                  {workerProfile?.is_available ? 'Hozir buyurtma oladi' : 'Hozir band'}
+                </span>
+                <span className="profile-badge">
+                  Tajriba: {workerProfile?.experience_years || 0} yil
+                </span>
+              </div>
+
+              <div className="worker-meta-grid">
+                <article className="worker-meta-card">
+                  <p className="worker-meta-label">Mutaxassislik</p>
+                  <p className="worker-meta-value">{workerProfile?.specialization || 'Kiritilmagan'}</p>
                 </article>
-              ))}
+                <article className="worker-meta-card">
+                  <p className="worker-meta-label">Xizmat hududi</p>
+                  <p className="worker-meta-value">{workerProfile?.service_city || 'Kiritilmagan'}</p>
+                </article>
+              </div>
+
+              <article className="worker-about-card">
+                <p className="worker-meta-label">O`zim haqimda</p>
+                <p>{workerProfile?.about || 'Hozircha ma`lumot qo`shilmagan.'}</p>
+              </article>
+            </>
+          )}
+
+          {activeSection === 'skills' && (
+            <div className="worker-skills-section">
+              <div className="section-row-head">
+                <h3>Xizmatlar</h3>
+                <button type="button" className="button button-ghost" onClick={openKonikmaModal}>
+                  Xizmat qo`shish
+                </button>
+              </div>
+              {!isKonikmaModalOpen && konikmaStatus.error && (
+                <p className="form-message error">{konikmaStatus.error}</p>
+              )}
+              {!isKonikmaModalOpen && konikmaStatus.success && (
+                <p className="form-message success">{konikmaStatus.success}</p>
+              )}
+
+              {konikmalar.length === 0 ? (
+                <p className="muted">Hozircha xizmat qo`shilmagan.</p>
+              ) : (
+                <div className="worker-skill-grid">
+                  {konikmalar.map((konikma) => (
+                    <article key={konikma.id} className="worker-skill-card">
+                      <div className="worker-skill-head">
+                        <h4>{konikma.title}</h4>
+                        <span className={`status-pill ${konikma.is_active ? 'status-completed' : 'status-cancelled'}`}>
+                          {konikma.is_active ? 'Faol' : 'Nofaol'}
+                        </span>
+                      </div>
+                      <p>{konikma.description || 'Izoh kiritilmagan'}</p>
+                      <p className="muted">Narx: {formatKonikmaPrice(konikma)}</p>
+                      <p className="muted">Tajriba: {konikma.experience_years || 0} yil</p>
+                      {konikma.extra_info && <p className="muted">Qo`shimcha: {konikma.extra_info}</p>}
+                      <div className="skill-card-actions">
+                        <button
+                          type="button"
+                          className="button button-ghost"
+                          onClick={() => onToggleKonikma(konikma)}
+                        >
+                          {konikma.is_active ? 'Nofaol qilish' : 'Faol qilish'}
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-ghost danger-button"
+                          onClick={() => onDeleteKonikma(konikma.id)}
+                        >
+                          O`chirish
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-        </div>
 
-        {status.error && <p className="form-message error">{status.error}</p>}
-      </article>
+          {activeSection === 'stats' && (
+            <div className="worker-skills-section">
+              <div className="section-row-head">
+                <h3>Profil statistikasi</h3>
+              </div>
+
+              <div className="worker-meta-grid">
+                <article className="worker-meta-card">
+                  <p className="worker-meta-label">Profil ko`rilgan</p>
+                  <p className="worker-meta-value">{workerStats?.profile_views_count || 0} marta</p>
+                </article>
+                <article className="worker-meta-card">
+                  <p className="worker-meta-label">Faol xizmatlar</p>
+                  <p className="worker-meta-value">{activeSkillsCount} ta</p>
+                </article>
+                <article className="worker-meta-card">
+                  <p className="worker-meta-label">Yakunlangan ishlar</p>
+                  <p className="worker-meta-value">{workerStats?.completed_orders_count || 0} ta</p>
+                </article>
+              </div>
+
+              <div>
+                <p className="worker-meta-label">Profilni yaqinda ko`rganlar</p>
+                {Array.isArray(workerStats?.recent_profile_viewers) && workerStats.recent_profile_viewers.length > 0 ? (
+                  <div className="worker-skill-grid">
+                    {workerStats.recent_profile_viewers.map((viewer) => (
+                      <article key={`${viewer.viewer_id}-${viewer.viewed_at}`} className="worker-skill-card">
+                        <h4>{viewer.viewer_name || 'Foydalanuvchi'}</h4>
+                        <p className="muted">{formatDate(viewer.viewed_at)}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="muted">Hozircha profilingizni ko`rgan foydalanuvchilar yo`q.</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeSection === 'portfolio' && (
+            <div className="worker-skills-section">
+              <div className="section-row-head">
+                <h3>Ish namunalarim</h3>
+                <button type="button" className="button button-ghost" onClick={openPortfolioModal}>
+                  Ish qo`shish
+                </button>
+              </div>
+              {!isPortfolioModalOpen && portfolioStatus.error && (
+                <p className="form-message error">{portfolioStatus.error}</p>
+              )}
+              {!isPortfolioModalOpen && portfolioStatus.success && (
+                <p className="form-message success">{portfolioStatus.success}</p>
+              )}
+
+              {portfolioItems.length === 0 ? (
+                <p className="muted">Hozircha ish namunalari yo`q.</p>
+              ) : (
+                <div className="worker-skill-grid">
+                  {portfolioItems.map((item) => (
+                    <article key={item.id} className="worker-skill-card">
+                      <div className="worker-skill-head">
+                        <h4>{item.title}</h4>
+                        {item.completed_at ? (
+                          <span className="status-pill status-open">{formatDate(item.completed_at)}</span>
+                        ) : null}
+                      </div>
+                      <p>{item.description || 'Tavsif kiritilmagan.'}</p>
+                      {item.location ? <p className="muted">Hudud: {item.location}</p> : null}
+                      {Array.isArray(item.images) && item.images.length > 0 ? (
+                        <div className="portfolio-image-row">
+                          {item.images.map((image) => (
+                            <img
+                              key={image.id}
+                              src={resolveMediaUrl(image.image_url)}
+                              alt={item.title}
+                              className="portfolio-image-thumb"
+                              loading="lazy"
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="skill-card-actions">
+                        <button
+                          type="button"
+                          className="button button-ghost danger-button"
+                          onClick={() => onDeletePortfolio(item.id)}
+                        >
+                          O`chirish
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSection === 'reviews' && (
+            <div className="worker-skills-section">
+              <div className="section-row-head">
+                <h3>Menga berilgan reviewlar</h3>
+              </div>
+
+              {workerReviews.length === 0 ? (
+                <p className="muted">Hozircha reviewlar yo`q.</p>
+              ) : (
+                <div className="worker-skill-grid">
+                  {workerReviews.map((review) => (
+                    <article key={review.id} className="worker-skill-card">
+                      <div className="worker-skill-head">
+                        <h4>{review.client_name || 'Mijoz'}</h4>
+                        <span className="status-pill status-open">{`${review.rating}/5`}</span>
+                      </div>
+                      <p className="muted">{formatDate(review.created_at)}</p>
+                      <p>{review.comment || 'Izoh qoldirilmagan.'}</p>
+                      {Array.isArray(review.images) && review.images.length > 0 ? (
+                        <div className="portfolio-image-row">
+                          {review.images.map((image) => (
+                            <img
+                              key={image.id}
+                              src={resolveMediaUrl(image.image_url)}
+                              alt="Review rasmi"
+                              className="portfolio-image-thumb"
+                              loading="lazy"
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {status.error && <p className="form-message error">{status.error}</p>}
+        </article>
+      </div>
 
       {isKonikmaModalOpen && (
         <div className="modal-backdrop" onClick={closeKonikmaModal} role="presentation">

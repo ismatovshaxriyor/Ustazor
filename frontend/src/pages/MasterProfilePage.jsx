@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { authApi } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { resolveMediaUrl } from '../utils/media';
 import { formatDate, formatSkillPrice } from '../utils/format';
 
@@ -12,24 +13,26 @@ const PROFILE_TABS = [
 ];
 
 function MasterProfilePage() {
+  const navigate = useNavigate();
   const { id } = useParams();
+  const { tokens, user, isAuthenticated } = useAuth();
   const [master, setMaster] = useState(null);
-  const [status, setStatus] = useState({ loading: true, error: '' });
+  const [status, setStatus] = useState({ loading: true, error: '', startingChat: false });
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     let active = true;
-    setStatus({ loading: true, error: '' });
+    setStatus({ loading: true, error: '', startingChat: false });
     setActiveTab('overview');
 
     authApi
-      .getPublicWorker(id)
+      .getPublicWorker(id, user ? (tokens?.access || null) : null)
       .then((data) => {
         if (!active) {
           return;
         }
         setMaster(data);
-        setStatus({ loading: false, error: '' });
+        setStatus({ loading: false, error: '', startingChat: false });
       })
       .catch((error) => {
         if (!active) {
@@ -39,13 +42,14 @@ function MasterProfilePage() {
         setStatus({
           loading: false,
           error: error.message || 'Usta profili topilmadi.',
+          startingChat: false,
         });
       });
 
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, tokens?.access, user]);
 
   if (status.loading) {
     return (
@@ -70,6 +74,34 @@ function MasterProfilePage() {
   const services = Array.isArray(master.skills) ? master.skills : [];
   const portfolioItems = Array.isArray(master.portfolio) ? master.portfolio : [];
   const reviews = Array.isArray(master.reviews) ? master.reviews : [];
+  const canStartChat = isAuthenticated && user?.user_type === 'client' && tokens?.access && master?.id;
+
+  const onStartChat = async () => {
+    if (!canStartChat) {
+      navigate('/auth/login?next=/chat');
+      return;
+    }
+    setStatus((prev) => ({ ...prev, startingChat: true, error: '' }));
+    try {
+      const data = await authApi.startChatThread(
+        {
+          worker_id: master.worker_user_id,
+          initial_message: `Salom, ${master.full_name || 'usta'}!`,
+        },
+        tokens.access,
+      );
+      if (!data?.thread_id) {
+        throw new Error('Chat yaratilmagan.');
+      }
+      navigate(`/chat/${data.thread_id}`);
+    } catch (error) {
+      setStatus((prev) => ({
+        ...prev,
+        startingChat: false,
+        error: error.message || 'Chatni boshlab bo`lmadi.',
+      }));
+    }
+  };
 
   return (
     <section className="profile-layout reveal-up">
@@ -244,13 +276,28 @@ function MasterProfilePage() {
         </div>
         <p className="muted">{master.is_available ? 'Hozir buyurtma oladi' : 'Hozir band'}</p>
         <p className="muted">Aloqa: {master.phone_number || 'Telefon kiritilmagan'}</p>
+        {master.secondary_phone_number ? (
+          <p className="muted">{`Qo'shimcha: ${master.secondary_phone_number}`}</p>
+        ) : null}
+        {master.telegram_username ? (
+          <p className="muted">{`Telegram: @${master.telegram_username}`}</p>
+        ) : null}
+        {master.instagram_username ? (
+          <p className="muted">{`Instagram: @${master.instagram_username}`}</p>
+        ) : null}
 
-        <Link to="/chat" className="button button-primary full-width">
-          Chatni boshlash
-        </Link>
+        <button
+          type="button"
+          className="button button-primary full-width"
+          onClick={onStartChat}
+          disabled={status.startingChat}
+        >
+          {status.startingChat ? 'Yuklanmoqda...' : 'Chatni boshlash'}
+        </button>
         <Link to="/elonlar" className="button button-ghost full-width">
           E'lonlarni ko`rish
         </Link>
+        {status.error ? <p className="form-message error">{status.error}</p> : null}
       </aside>
     </section>
   );

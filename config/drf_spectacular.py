@@ -35,5 +35,9 @@ SPECTACULAR_SETTINGS = {
             'description': 'Mijozning baholashlari, baho rasmlari va usta portfolio endpointlari.',
         },
     ],
+    'ENUM_NAME_OVERRIDES': {
+        'OrderStatusEnum': 'apps.jobs.models.ORDER_STATUS_CHOICES',
+        'ProposalStatusEnum': 'apps.proposals.models.PROPOSAL_STATUS_CHOICES',
+    },
     "SERVE_INCLUDE_SCHEMA": False,
 }
