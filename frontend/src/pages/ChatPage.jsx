@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown, Paperclip, SendHorizonal, Smile, X } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
+import ChatSidebar from '../components/chat/ChatSidebar';
+import ChatMessageList from '../components/chat/ChatMessageList';
+import ChatComposer from '../components/chat/ChatComposer';
 import { authApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -12,158 +15,24 @@ import {
   normalizeListResponse as normalizeList,
 } from '../utils/format';
 
-function formatMessageTime(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return '';
-  const now = new Date();
-  const isSameDay = (
-    d.getFullYear() === now.getFullYear()
-    && d.getMonth() === now.getMonth()
-    && d.getDate() === now.getDate()
-  );
-  if (isSameDay) {
-    return d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
-  }
-  const day = d.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit' });
-  const time = d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' });
-  return `${day} ${time}`;
-}
-
-function formatLastSeen(dateStr) {
-  if (!dateStr) return 'noma`lum';
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return 'noma`lum';
-  const now = new Date();
-  const diffMs = now - d;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 3) return 'online';
-  if (diffMin < 60) return `${diffMin} daqiqa oldin`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} soat oldin`;
-  return d.toLocaleDateString('uz-UZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
-
-const WS_RECONNECT_DELAY_MS = 1500;
-const FALLBACK_POLL_INTERVAL_MS = 2500;
-const MAX_ATTACHMENT_SIZE_BYTES = 15 * 1024 * 1024;
-const QUICK_EMOJIS = ['😀', '😁', '😂', '🙂', '😉', '😍', '🤝', '👍', '🙏', '👏', '🔥', '✅', '❗', '🎉'];
-const VACANCY_STATUS_LABELS = {
-  open: 'Yangi',
-  in_progress: 'Jarayonda',
-  completed: 'Yakunlangan',
-  cancelled: 'Bekor qilingan',
-};
-
-function mergeMessageLists(current, incoming) {
-  const map = new Map();
-  current.forEach((item) => {
-    map.set(item.id, item);
-  });
-  incoming.forEach((item) => {
-    map.set(item.id, item);
-  });
-
-  return Array.from(map.values()).sort((a, b) => {
-    const left = Date.parse(a.created_at || '') || 0;
-    const right = Date.parse(b.created_at || '') || 0;
-    if (left !== right) {
-      return left - right;
-    }
-    return (a.id || 0) - (b.id || 0);
-  });
-}
-
-function buildWsUrl(threadId, token) {
-  const apiBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://127.0.0.1:8000';
-  const wsBase = apiBase.startsWith('https')
-    ? apiBase.replace(/^https/, 'wss')
-    : apiBase.replace(/^http/, 'ws');
-
-  return `${wsBase}/ws/chat/threads/${threadId}/?token=${encodeURIComponent(token)}`;
-}
-
-function getOtherUserId(thread, currentUserId) {
-  if (!thread) return null;
-  if (thread.client_id === currentUserId) return thread.worker_id;
-  return thread.client_id;
-}
-
-function getOwnMessageState(message, activeThread, currentUserId) {
-  if (!message || !activeThread || !currentUserId) return null;
-  if (message.is_system || message.sender_id !== currentUserId) return null;
-
-  const senderIsClient = activeThread.client_id === currentUserId;
-  const deliveredAt = senderIsClient ? message.delivered_to_worker_at : message.delivered_to_client_at;
-  const readAt = senderIsClient ? message.read_by_worker_at : message.read_by_client_at;
-
-  if (readAt) return 'read';
-  if (deliveredAt) return 'delivered';
-  return 'sent';
-}
-
-function splitMessageVacancyContext(body) {
-  const text = `${body || ''}`;
-  const lines = text.split('\n');
-  const firstLine = `${lines[0] || ''}`.trim();
-  if (!firstLine.toLowerCase().startsWith("e`lon:")) {
-    return { vacancyTitle: '', content: text };
-  }
-  const vacancyTitle = firstLine.replace(/^e`lon:\s*/i, '').trim();
-  const content = lines.slice(1).join('\n').trim();
-  return {
-    vacancyTitle,
-    content,
-  };
-}
-
-function resolveAttachmentUrl(value) {
-  if (!value) return '';
-  if (value.startsWith('http://') || value.startsWith('https://')) {
-    return value;
-  }
-  const apiBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || 'http://127.0.0.1:8000';
-  return `${apiBase}${value.startsWith('/') ? value : `/${value}`}`;
-}
-
-function isImageAttachment(name = '') {
-  return /\.(png|jpe?g|gif|webp|bmp|svg|heic|heif)$/i.test(name);
-}
-
-function getProposalGroupKey(option) {
-  if (!option) return '';
-  if (option.vacancy_id !== null && option.vacancy_id !== undefined && option.vacancy_id !== '') {
-    return `vacancy-${option.vacancy_id}`;
-  }
-  if (option.id !== null && option.id !== undefined && option.id !== '') {
-    return `proposal-${option.id}`;
-  }
-  return '';
-}
-
-function getThreadProposalOptions(thread) {
-  if (!thread) {
-    return [];
-  }
-  const options = Array.isArray(thread.proposal_options)
-    ? thread.proposal_options.filter(Boolean)
-    : [];
-  if (options.length > 0) {
-    return options;
-  }
-
-  if (thread.vacancy_id || thread.vacancy_title || thread.proposal_id) {
-    return [
-      {
-        id: thread.proposal_id || null,
-        vacancy_id: thread.vacancy_id || null,
-        vacancy_title: thread.vacancy_title || 'E`lon ko`rsatilmagan',
-        status: thread.proposal_status || null,
-      },
-    ];
-  }
-  return [];
-}
+import {
+  WS_RECONNECT_DELAY_MS,
+  FALLBACK_POLL_INTERVAL_MS,
+  MAX_ATTACHMENT_SIZE_BYTES,
+  QUICK_EMOJIS,
+  VACANCY_STATUS_LABELS,
+  formatMessageTime,
+  formatLastSeen,
+  mergeMessageLists,
+  buildWsUrl,
+  getOtherUserId,
+  getOwnMessageState,
+  splitMessageVacancyContext,
+  resolveAttachmentUrl,
+  isImageAttachment,
+  getProposalGroupKey,
+  getThreadProposalOptions
+} from '../components/chat/chatUtils';
 
 function ChatPage() {
   const navigate = useNavigate();
@@ -968,108 +837,18 @@ function ChatPage() {
   const otherOnline = Boolean(activeThread?.other_user_online);
   const otherLastSeen = activeThread?.other_user_last_seen_at || null;
 
-  const renderThreadItem = (thread) => {
-    const isActive = thread.id === activeThreadId;
-    const threadOnline = Boolean(thread.other_user_online);
-    return (
-      <button
-        key={thread.id}
-        type="button"
-        className={`chat-contact${isActive ? ' chat-contact-active' : ''}`}
-        onClick={() => openThread(thread)}
-      >
-        <div className="chat-contact-avatar-wrap">
-          <img
-            src={resolveMediaUrl(thread.other_user_photo, { userType: thread.other_user_type || 'client' })}
-            alt={thread.other_user_name}
-            className="chat-contact-avatar"
-          />
-          <span className={`online-dot online-dot-abs${threadOnline ? ' online-dot-active' : ''}`} />
-        </div>
-        <div className="chat-contact-info">
-          <span className="chat-contact-name">{thread.other_user_name}</span>
-          <p className="muted chat-contact-preview">{thread.last_message || 'Xabar yo`q'}</p>
-          <p className="muted chat-contact-sub">
-            {(() => {
-              const options = getThreadProposalOptions(thread);
-              if (selectedVacancyKey !== 'all') {
-                const matched = options.find((option) => getProposalGroupKey(option) === selectedVacancyKey);
-                return matched?.vacancy_title || thread.vacancy_title || 'E`lon ko`rsatilmagan';
-              }
-              return options.length > 1
-                ? `${options.length} ta e\`lon`
-                : (options[0]?.vacancy_title || thread.vacancy_title || 'E`lon ko`rsatilmagan');
-            })()}
-          </p>
-        </div>
-        <div className="chat-contact-end">
-          {thread.last_message_at && (
-            <span className="chat-contact-time">{formatMessageTime(thread.last_message_at)}</span>
-          )}
-          {getThreadUnread(thread.id) > 0 && (
-            <span className="chat-unread-badge">{getThreadUnread(thread.id)}</span>
-          )}
-        </div>
-      </button>
-    );
-  };
-
   return (
     <section className="chat-shell reveal-up">
-      <aside className="chat-list card">
-        <p className="chat-title">Suhbatlar</p>
-        <div className="chat-list-scroll">
-          {status.threadsLoading ? (
-            <p className="muted">Suhbatlar yuklanmoqda...</p>
-          ) : threads.length === 0 ? (
-            <p className="muted">Hozircha chatlar yo`q. E`longa murojaat yuboring.</p>
-          ) : (
-            <>
-              <section className="chat-group chat-group-vacancies">
-                <div className="chat-group-head">
-                  <h4 className="chat-group-title">E`lonlar</h4>
-                  <span className="chat-group-count">{vacancyGroups.length}</span>
-                </div>
-                <div className="chat-group-list chat-group-list-vacancies">
-                  <button
-                    type="button"
-                    className={`chat-vacancy-filter${selectedVacancyKey === 'all' ? ' chat-vacancy-filter-active' : ''}`}
-                    onClick={() => onSelectVacancyFilter('all')}
-                  >
-                    <span className="chat-vacancy-filter-title">Barcha e`lonlar</span>
-                    <span className="chat-vacancy-filter-meta">{threads.length} ta suhbat</span>
-                  </button>
-                  {vacancyGroups.map((group) => (
-                    <button
-                      key={group.key}
-                      type="button"
-                      className={`chat-vacancy-filter${selectedVacancyKey === group.key ? ' chat-vacancy-filter-active' : ''}`}
-                      onClick={() => onSelectVacancyFilter(group.key)}
-                    >
-                      <span className="chat-vacancy-filter-title">{group.title}</span>
-                      <span className="chat-vacancy-filter-meta">{group.threadCount} ta suhbat</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section className="chat-group chat-group-threads">
-                <div className="chat-group-head">
-                  <h4 className="chat-group-title">Suhbatlar</h4>
-                  <span className="chat-group-count">{filteredThreads.length}</span>
-                </div>
-                <div className="chat-group-list chat-group-list-threads">
-                  {filteredThreads.length === 0 ? (
-                    <p className="muted">Tanlangan e`lon bo`yicha suhbat topilmadi.</p>
-                  ) : (
-                    filteredThreads.map((thread) => renderThreadItem(thread))
-                  )}
-                </div>
-              </section>
-            </>
-          )}
-        </div>
-      </aside>
+      <ChatSidebar
+        threadsLoading={status.threadsLoading}
+        threads={threads}
+        vacancyGroups={vacancyGroups}
+        selectedVacancyKey={selectedVacancyKey}
+        filteredThreads={filteredThreads}
+        activeThreadId={activeThreadId}
+        onSelectVacancyFilter={onSelectVacancyFilter}
+        openThread={openThread}
+      />
 
       <article className="chat-window card">
         {!activeThread ? (
@@ -1164,68 +943,13 @@ function ChatPage() {
               </div>
             </header>
 
-            <div className="chat-messages" ref={messagesContainerRef}>
-              {status.messagesLoading ? (
-                <p className="muted">Xabarlar yuklanmoqda...</p>
-              ) : messages.length === 0 ? (
-                <p className="muted">Hozircha xabar yo`q. Birinchi bo`lib yozing!</p>
-              ) : (
-                messages.map((message) => {
-                  const isSelf = message.sender_id === user?.id;
-                  const isSystem = message.is_system;
-                  const ownState = getOwnMessageState(message, activeThread, user?.id);
-                  const ownStateTick = ownState === 'sent' ? '✔' : '✔✔';
-                  const parsedMessage = splitMessageVacancyContext(message.body);
-                  const attachmentUrl = resolveAttachmentUrl(message.attachment_url);
-                  const attachmentName = message.attachment_name || 'Fayl';
-                  const isImage = attachmentUrl && isImageAttachment(attachmentName);
-
-                  return (
-                    <div
-                      key={message.id}
-                      className={`message-bubble${isSelf ? ' message-self' : ''}${isSystem ? ' message-system' : ''}`}
-                    >
-                      {parsedMessage.vacancyTitle && <p className="message-vacancy-pill">{parsedMessage.vacancyTitle}</p>}
-                      {!isSystem && <p className="message-author">{message.sender_name}</p>}
-                      {parsedMessage.content ? <p className="message-body">{parsedMessage.content}</p> : null}
-                      {attachmentUrl ? (
-                        <div className="message-attachment-wrap">
-                          {isImage ? (
-                            <a href={attachmentUrl} target="_blank" rel="noreferrer" className="message-attachment-image-link">
-                              <img
-                                src={attachmentUrl}
-                                alt={attachmentName}
-                                className="message-attachment-image"
-                                loading="lazy"
-                              />
-                            </a>
-                          ) : null}
-                          <a
-                            href={attachmentUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="message-attachment-link"
-                            download={attachmentName}
-                          >
-                            {`📎 ${attachmentName}`}
-                          </a>
-                        </div>
-                      ) : null}
-                      {message.created_at && (
-                        <span className="message-meta">
-                          <span className="message-time">{formatMessageTime(message.created_at)}</span>
-                          {ownState ? (
-                            <span className={`message-check message-check-${ownState}`} title={ownState}>
-                              {ownStateTick}
-                            </span>
-                          ) : null}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            <ChatMessageList
+              messagesLoading={status.messagesLoading}
+              messages={messages}
+              user={user}
+              activeThread={activeThread}
+              messagesContainerRef={messagesContainerRef}
+            />
 
             {showScrollBtn && (
               <button
@@ -1246,65 +970,20 @@ function ChatPage() {
               </button>
             )}
 
-            <div className="chat-composer">
-              {selectedFile ? (
-                <div className="chat-file-chip">
-                  <span className="chat-file-name">{selectedFile.name}</span>
-                  <button type="button" className="chat-chip-remove" onClick={removeAttachment} aria-label="Faylni olib tashlash">
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : null}
-
-              {emojiOpen ? (
-                <div className="chat-emoji-panel" ref={emojiPanelRef}>
-                  {QUICK_EMOJIS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      className="chat-emoji-btn"
-                      onClick={() => onInsertEmoji(emoji)}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
-              <form className="chat-input-row" onSubmit={onSendMessage}>
-                <button
-                  type="button"
-                  className="button button-ghost chat-input-action"
-                  onClick={() => setEmojiOpen((prev) => !prev)}
-                  aria-label="Emoji tanlash"
-                >
-                  <Smile size={16} />
-                </button>
-                <button
-                  type="button"
-                  className="button button-ghost chat-input-action"
-                  onClick={() => fileInputRef.current?.click()}
-                  aria-label="Fayl biriktirish"
-                >
-                  <Paperclip size={16} />
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="chat-file-input"
-                  onChange={onPickAttachment}
-                />
-                <input
-                  className="input chat-input"
-                  placeholder="Xabar yozing..."
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                />
-                <button className="button button-primary chat-send-btn" type="submit" disabled={status.sending}>
-                  <SendHorizonal size={16} />
-                </button>
-              </form>
-            </div>
+            <ChatComposer
+              selectedFile={selectedFile}
+              removeAttachment={removeAttachment}
+              emojiOpen={emojiOpen}
+              emojiPanelRef={emojiPanelRef}
+              setEmojiOpen={setEmojiOpen}
+              onInsertEmoji={onInsertEmoji}
+              onSendMessage={onSendMessage}
+              fileInputRef={fileInputRef}
+              onPickAttachment={onPickAttachment}
+              draft={draft}
+              setDraft={setDraft}
+              sending={status.sending}
+            />
           </>
         )}
 

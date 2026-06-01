@@ -105,6 +105,18 @@ function handleUnauthorizedAuth() {
   }
 }
 
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+function subscribeTokenRefresh(cb) {
+  refreshSubscribers.push(cb);
+}
+
+function onRefreshed(token) {
+  refreshSubscribers.map((cb) => cb(token));
+  refreshSubscribers = [];
+}
+
 async function request(path, options = {}) {
   const isFormData = options.body instanceof FormData;
   const headers = { ...(options.headers || {}) };
@@ -123,13 +135,77 @@ async function request(path, options = {}) {
     throw new Error('Server bilan bog`lanib bo`lmadi. Internet yoki backendni tekshiring.');
   }
 
-  const data = await response.json().catch(() => ({}));
+  let data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
     const hasAuthHeader = Boolean(headers.Authorization || headers.authorization);
-    if (response.status === 401 && hasAuthHeader) {
-      handleUnauthorizedAuth();
-      throw new Error('Sessiya tugadi. Qayta tizimga kiring.');
+    
+    if (response.status === 401 && hasAuthHeader && path !== '/api/token/refresh/') {
+      const refreshToken = localStorage.getItem(REFRESH_KEY);
+      
+      if (!refreshToken) {
+        handleUnauthorizedAuth();
+        throw new Error('Sessiya tugadi. Qayta tizimga kiring.');
+      }
+
+      if (!isRefreshing) {
+        isRefreshing = true;
+        try {
+          const refreshRes = await fetch(`${API_BASE_URL}/api/token/refresh/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh: refreshToken })
+          });
+          
+          if (!refreshRes.ok) {
+            throw new Error('Refresh failed');
+          }
+          
+          const refreshData = await refreshRes.json();
+          const newAccess = refreshData.access;
+          const newRefresh = refreshData.refresh || refreshToken;
+          
+          localStorage.setItem(ACCESS_KEY, newAccess);
+          localStorage.setItem(REFRESH_KEY, newRefresh);
+          
+          // Notify AuthContext to update its state
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('ustazor:token_refreshed', { 
+              detail: { access: newAccess, refresh: newRefresh } 
+            }));
+          }
+          
+          isRefreshing = false;
+          onRefreshed(newAccess);
+        } catch (err) {
+          isRefreshing = false;
+          refreshSubscribers = [];
+          handleUnauthorizedAuth();
+          throw new Error('Sessiya tugadi. Qayta tizimga kiring.');
+        }
+      }
+
+      // Wait for refresh to complete
+      const newAccessToken = await new Promise((resolve) => {
+        subscribeTokenRefresh((token) => resolve(token));
+      });
+
+      // Retry request
+      headers.Authorization = `Bearer ${newAccessToken}`;
+      try {
+        response = await fetch(`${API_BASE_URL}${path}`, {
+          ...options,
+          headers,
+        });
+        data = await response.json().catch(() => ({}));
+        
+        if (!response.ok) {
+          throw new Error(toMessage(data) || 'So`rov bajarilmadi.');
+        }
+        return data;
+      } catch (retryErr) {
+        throw new Error(retryErr.message || 'Server bilan bog`lanib bo`lmadi.');
+      }
     }
 
     const message = toMessage(data) || 'So`rov bajarilmadi.';

@@ -125,7 +125,6 @@ MY_APPS = [
     'apps.jobs',
     'apps.proposals',
     'apps.reviews',
-    'apps.users',
 ]
 
 THIRD_PARTY_APPS = [

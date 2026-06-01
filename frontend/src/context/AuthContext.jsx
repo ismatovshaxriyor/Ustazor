@@ -442,6 +442,18 @@ export function AuthProvider({ children }) {
     ],
   );
 
+  useEffect(() => {
+    const handleTokenRefreshed = (e) => {
+      const { access, refresh } = e.detail;
+      setTokens({ access, refresh });
+    };
+    
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ustazor:token_refreshed', handleTokenRefreshed);
+      return () => window.removeEventListener('ustazor:token_refreshed', handleTokenRefreshed);
+    }
+  }, []);
+
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
