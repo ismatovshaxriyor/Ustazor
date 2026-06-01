@@ -14,6 +14,7 @@ files = [
 
 [package.dependencies]
 idna = ">=2.8"
+typing_extensions = {version = ">=4.5", markers = "python_version < \"3.13\""}
 
 [package.extras]
 trio = ["trio (>=0.32.0)"]
@@ -1219,6 +1220,7 @@ files = [
 
 [package.dependencies]
 cryptography = ">=46.0.0,<47"
+typing-extensions = {version = ">=4.9", markers = "python_version < \"3.13\" and python_version >= \"3.8\""}
 
 [package.extras]
 docs = ["sphinx (!=5.2.0,!=5.2.0.post0,!=7.2.5)", "sphinx_rtd_theme"]
@@ -1372,6 +1374,7 @@ files = [
 [package.dependencies]
 attrs = ">=22.2.0"
 rpds-py = ">=0.7.0"
+typing-extensions = {version = ">=4.4.0", markers = "python_version < \"3.13\""}
 
 [[package]]
 name = "rpds-py"
@@ -2113,5 +2116,5 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.14"
-content-hash = "3d7ade7ea888d5f2a1ab66b9a874b13f78154a6b360ecd29b845608c65ab9a02"
+python-versions = ">=3.12"
+content-hash = "4218e91eb8ea9a750ae1c1ba6aef8a5e73ad2b64582d3866f62c20aec5b5de17"
